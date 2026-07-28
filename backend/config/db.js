@@ -1,4 +1,11 @@
+const dns = require('dns');
 const mongoose = require('mongoose');
+
+// This machine's default DNS resolver refuses SRV queries (returns
+// ECONNREFUSED for _mongodb._tcp... lookups) even though normal DNS
+// resolution works, which breaks mongodb+srv:// connection strings.
+// Point Node's resolver at public DNS servers that do answer SRV queries.
+dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI;

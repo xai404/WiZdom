@@ -34,6 +34,40 @@ const studentSchema = new mongoose.Schema(
     lastLoginAt: {
       type: Date,
     },
+
+    // Optional — only present for accounts auto-provisioned by the CRM on
+    // lead conversion. Kept here (rather than dropped) so that context
+    // isn't lost; the WiZdom Admin Portal's Students page can surface it
+    // once built. See E:\CRM\backend\services\wizdomService.js.
+    phone: { type: String, trim: true },
+    gender: { type: String },
+    countryInterested: { type: [String], default: undefined },
+    intakeMonth: { type: Number },
+    intakeYear: { type: Number },
+    course: { type: String, trim: true },
+    crmStudentId: { type: String, index: true },
+    source: { type: String, default: 'wizdom' },
+
+    // Read-only from the Student App's perspective — the "My Journey"
+    // screen only ever GETs this. Only Admin-side tooling (not built yet)
+    // is meant to write to it. Missing/unset stages default to "pending"
+    // at read-time (see studentJourneyController.js), so this can stay
+    // empty until an admin actually starts updating a student's progress.
+    journey: {
+      type: [
+        {
+          _id: false,
+          title: { type: String, required: true },
+          status: {
+            type: String,
+            enum: ['pending', 'in_progress', 'completed'],
+            default: 'pending',
+          },
+          updatedAt: { type: Date, default: null },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
@@ -57,6 +91,13 @@ studentSchema.methods.toSafeObject = function toSafeObject() {
     role: this.role,
     isActive: this.isActive,
     createdAt: this.createdAt,
+    phone: this.phone,
+    gender: this.gender,
+    countryInterested: this.countryInterested,
+    intakeMonth: this.intakeMonth,
+    intakeYear: this.intakeYear,
+    course: this.course,
+    source: this.source,
   };
 };
 
