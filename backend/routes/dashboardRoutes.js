@@ -4,6 +4,6 @@ const { protect, requireRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.get('/stats', protect, requireRole('admin'), getStats);
+router.get('/stats', protect, getStats);
 
 module.exports = router;

@@ -1,16 +1,18 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { fetchCurrentUser, loginRequest } from '../api/auth';
 import { TOKEN_STORAGE_KEY } from '../api/client';
-import type { AuthUser } from '../types';
+import type { AuthUser, UserRole } from '../types';
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const ALLOWED_ROLES: UserRole[] = ['super_admin', 'counsellor', 'application_team', 'editing_team'];
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -35,12 +37,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const { token, user: loggedInUser } = await loginRequest(email, password);
 
-    if (loggedInUser.role !== 'admin') {
-      throw new Error('This portal is for administrators only.');
+    if (!ALLOWED_ROLES.includes(loggedInUser.role)) {
+      throw new Error('Your account does not have access to this portal.');
     }
 
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
     setUser(loggedInUser);
+    return loggedInUser;
   };
 
   const logout = () => {

@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ROLE_HOME_PATH } from '../config/roles';
 
 const Login = () => {
   const { login, user, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -12,7 +14,7 @@ const Login = () => {
   const [submitting, setSubmitting] = useState(false);
 
   if (!isLoading && user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={ROLE_HOME_PATH[user.role]} replace />;
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -26,7 +28,8 @@ const Login = () => {
 
     setSubmitting(true);
     try {
-      await login(email.trim(), password);
+      const loggedInUser = await login(email.trim(), password);
+      navigate(ROLE_HOME_PATH[loggedInUser.role], { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Unable to log in. Please try again.');
     } finally {

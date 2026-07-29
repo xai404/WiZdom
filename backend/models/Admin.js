@@ -22,11 +22,11 @@ const adminSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
-    role: {
-      type: String,
-      default: 'admin',
-      immutable: true,
-    },
+role: {
+  type: String,
+  default: 'super_admin',
+  immutable: true,
+},
     lastLoginAt: {
       type: Date,
     },

@@ -5,9 +5,10 @@ const morgan = require('morgan');
 
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
-const studentRoutes = require('./routes/studentRoutes');
+const studentRoutes = require('./routes/studentRoutes');           // existing: /journey (student-facing)
+const studentsAdminRoutes = require('./routes/studentsAdminRoutes'); // new: admin CRUD
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-
+const employeesRoutes = require('./routes/employeesRoutes');
 const app = express();
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
@@ -19,7 +20,6 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser clients (curl, mobile apps) with no origin header
       if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
@@ -41,7 +41,9 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/student', studentRoutes);
+app.use('/api/employees', employeesRoutes);
+app.use('/api/student', studentRoutes);          // /api/student/journey — student app
+app.use('/api/students', studentsAdminRoutes);   // /api/students, /api/students/:id — admin panel
 
 app.use(notFound);
 app.use(errorHandler);
