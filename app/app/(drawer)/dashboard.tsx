@@ -1,34 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
+import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import { useNavigation, useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PressableScale } from '@/components/pressable-scale';
-import { TopBar } from '@/components/top-bar';
+import { EmptyState } from '@/components/empty-state';
+import { JourneyCardSkeleton } from '@/components/skeleton';
+import { STATUS_META } from '@/constants/journey-meta';
 import { useAuth } from '@/context/auth-context';
+import { useChat } from '@/context/chat-context';
+import { useJourney } from '@/context/journey-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { fetchMyJourney, type JourneyStage, type JourneyStageStatus } from '@/lib/journey-api';
-
-const QUICK_ACTIONS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
-  { icon: 'compass-outline', label: 'My Journey', route: '/my-journey' },
-  { icon: 'document-text-outline', label: 'Documents', route: '/documents' },
-  { icon: 'chatbubble-ellipses-outline', label: 'Messages', route: '/messages' },
-  { icon: 'headset-outline', label: 'Support', route: '/support' },
-];
-
-const PREVIEW_ICON: Record<JourneyStageStatus, keyof typeof Ionicons.glyphMap> = {
-  completed: 'checkmark-circle',
-  in_progress: 'time',
-  pending: 'ellipse-outline',
-};
-
-const PREVIEW_COLOR: Record<JourneyStageStatus, string> = {
-  completed: '#22c55e',
-  in_progress: '#f59e0b',
-  pending: '#f43f5e',
-};
+import { formatFullDate, formatRelativeShort } from '@/lib/format-date';
+import type { JourneyStage } from '@/lib/journey-api';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -37,31 +35,21 @@ function getGreeting() {
   return 'Good Evening';
 }
 
+function getInitials(name?: string) {
+  if (!name) return 'S';
+  const parts = name.trim().split(/\s+/);
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'S';
+}
+
 export default function DashboardScreen() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
+  const { journey, loading, error, reload } = useJourney();
+  const { unreadCount } = useChat();
   const { isDark } = useAppTheme();
   const router = useRouter();
-
-  const [journey, setJourney] = useState<JourneyStage[] | null>(null);
-  const [journeyError, setJourneyError] = useState<string | null>(null);
+  const navigation = useNavigation<DrawerNavigationProp<Record<string, object | undefined>>>();
 
   const fade = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
-  const loadJourney = useCallback(() => {
-    if (!token) {
-      setJourneyError('Your session has expired. Please log in again.');
-      return;
-    }
-    setJourneyError(null);
-    fetchMyJourney(token)
-      .then(setJourney)
-      .catch((err) => setJourneyError(err instanceof Error ? err.message : 'Unable to load your journey.'));
-  }, [token]);
-
-  useEffect(() => {
-    loadJourney();
-  }, [loadJourney]);
 
   useEffect(() => {
     Animated.timing(fade, {
@@ -72,141 +60,193 @@ export default function DashboardScreen() {
     }).start();
   }, [fade]);
 
-  const completedCount = journey?.filter((stage) => stage.status === 'completed').length ?? 0;
-  const total = journey?.length ?? 0;
-  const progress = total > 0 ? completedCount / total : 0;
-  const currentStage =
-    journey?.find((stage) => stage.status === 'in_progress') ??
-    journey?.find((stage) => stage.status === 'pending');
-  const currentStageTitle = currentStage?.title ?? (journey ? 'Process Complete' : '');
-  const previewStages = journey?.slice(0, 4) ?? [];
-
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 900,
-      delay: 200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [progress, progressAnim]);
-
-  const progressWidth = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? 'Student';
+  const today = useMemo(() => formatFullDate(), []);
+
+  const isInitialLoading = loading && !journey;
+  const isRefreshing = loading && !!journey;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <TopBar />
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-        className="px-5">
-        <Animated.View
-          style={{ opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}
-          className="w-full max-w-2xl self-center">
-          <Text className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
+        <View className="flex-1 pr-3">
+          <Text className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" numberOfLines={1}>
             {getGreeting()}, {firstName} 👋
           </Text>
+          <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">{today}</Text>
+        </View>
 
-          {!journey && !journeyError ? (
-            <View className="mt-6 items-center justify-center rounded-[28px] bg-card py-12 dark:bg-card-dark">
-              <ActivityIndicator color={isDark ? '#8bb4fd' : '#0049B7'} />
-            </View>
-          ) : journeyError ? (
-            <View className="mt-6 rounded-[28px] bg-card p-6 dark:bg-card-dark">
-              <Text className="text-sm text-slate-500 dark:text-slate-400">{journeyError}</Text>
-              <Pressable onPress={loadJourney} className="mt-3 self-start">
-                <Text className="text-sm font-semibold text-brand-600 dark:text-brand-300">Try Again</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <>
-              <LinearGradient
-                colors={isDark ? ['#0049B7', '#001f4d'] : ['#3B82F6', '#0049B7']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ borderRadius: 28, padding: 22, marginTop: 20 }}>
-                <Text className="text-sm font-medium text-white/70">Current Stage</Text>
-                <Text className="mt-1 text-2xl font-bold text-white">{currentStageTitle}</Text>
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            onPress={() => router.push('/group-chat' as never)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Open Group Chat"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
+            <Ionicons name="notifications-outline" size={22} color={isDark ? '#f1f5f9' : '#0f172a'} />
+            {unreadCount > 0 ? (
+              <View className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-surface bg-brand-600 dark:border-surface-dark" />
+            ) : null}
+          </Pressable>
 
-                <View className="mt-5 h-2.5 overflow-hidden rounded-full bg-white/20">
-                  <Animated.View
-                    style={{
-                      width: progressWidth,
-                      height: '100%',
-                      borderRadius: 999,
-                      backgroundColor: '#ffffff',
-                    }}
-                  />
-                </View>
-                <Text className="mt-2 text-sm font-semibold text-white/90">
-                  {Math.round(progress * 100)}% complete
-                </Text>
-              </LinearGradient>
+          <Pressable
+            onPress={() => navigation.toggleDrawer()}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu">
+            <LinearGradient
+              colors={['#3B82F6', '#0049B7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+              <Text className="text-sm font-bold text-white">{getInitials(user?.name)}</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
 
-              <View className="mt-8 flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-slate-900 dark:text-white">Journey Timeline</Text>
-              </View>
-
-              <View className="mt-4 rounded-3xl bg-card p-5 dark:bg-card-dark">
-                {previewStages.map((stage, index) => (
-                  <View
-                    key={stage.title}
-                    className={`flex-row items-center gap-3 ${
-                      index === previewStages.length - 1 ? '' : 'mb-4'
-                    }`}>
-                    <Ionicons name={PREVIEW_ICON[stage.status]} size={22} color={PREVIEW_COLOR[stage.status]} />
-                    <Text
-                      className={`text-[15px] ${
-                        stage.status === 'completed'
-                          ? 'text-slate-500 dark:text-slate-400'
-                          : 'font-semibold text-slate-900 dark:text-white'
-                      }`}>
-                      {stage.title}
-                    </Text>
-                  </View>
-                ))}
-
-                <Pressable
-                  onPress={() => router.push('/my-journey')}
-                  className="mt-3 self-start rounded-full bg-brand-50 px-4 py-2 active:bg-brand-100 dark:bg-slate-800 dark:active:bg-slate-700">
-                  <Text className="text-sm font-semibold text-brand-600 dark:text-brand-300">
-                    View Complete Journey
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-
-          <Text className="mt-8 text-lg font-bold text-slate-900 dark:text-white">Quick Actions</Text>
-          <View className="mt-4 flex-row flex-wrap justify-between gap-y-4">
-            {QUICK_ACTIONS.map((action) => (
-              <PressableScale key={action.route} onPress={() => router.push(action.route as never)} style={{ width: '48%' }}>
-                <View
-                  className="items-start rounded-3xl bg-card p-5 dark:bg-card-dark"
-                  style={{
-                    shadowColor: '#0f172a',
-                    shadowOpacity: isDark ? 0 : 0.05,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: isDark ? 0 : 1,
-                  }}>
-                  <View className="h-11 w-11 items-center justify-center rounded-2xl bg-brand-100 dark:bg-slate-800">
-                    <Ionicons name={action.icon} size={20} color={isDark ? '#8bb4fd' : '#0049B7'} />
-                  </View>
-                  <Text className="mt-3 text-[15px] font-semibold text-slate-800 dark:text-slate-100">
-                    {action.label}
-                  </Text>
-                </View>
-              </PressableScale>
+      {isInitialLoading ? (
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="px-5">
+          <View className="w-full max-w-2xl self-center pt-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <JourneyCardSkeleton key={i} />
             ))}
           </View>
+        </ScrollView>
+      ) : error ? (
+        <View className="flex-1 items-center justify-center px-10">
+          <Ionicons name="cloud-offline-outline" size={32} color="#94a3b8" />
+          <Text className="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">{error}</Text>
+          <Pressable onPress={reload} className="mt-5 rounded-full bg-brand-600 px-5 py-2.5 active:bg-brand-700">
+            <Text className="text-sm font-semibold text-white">Try Again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            className="px-5"
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#8bb4fd' : '#0049B7'} />}>
+            <Animated.View
+              style={{
+                opacity: fade,
+                transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+              }}
+              className="w-full max-w-2xl self-center pt-1">
+              <Text className="mb-3 text-lg font-bold text-slate-900 dark:text-white">My Journey</Text>
 
-          <Text className="mt-10 text-center text-sm italic text-slate-400 dark:text-slate-500">
-            Every step brings you closer to your dream university.
-          </Text>
-        </Animated.View>
-      </ScrollView>
+              {journey && journey.length === 0 ? (
+                <EmptyState
+                  icon="compass-outline"
+                  title="Your journey will appear here"
+                  description="Once your counsellor sets up your study abroad plan, every stage will show up here."
+                />
+              ) : (
+                journey?.map((stage, index) => <StageCard key={stage.title} stage={stage} index={index} />)
+              )}
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
+  );
+}
+
+function StageCard({ stage, index }: { stage: JourneyStage; index: number }) {
+  const meta = STATUS_META[stage.status];
+  const { isDark } = useAppTheme();
+  const { sendReply } = useChat();
+  const { applyOptimisticRemark } = useJourney();
+  const fade = useRef(new Animated.Value(0)).current;
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 380,
+      delay: Math.min(index * 40, 640),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [fade, index]);
+
+  const handleSend = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    sendReply(trimmed, stage.title);
+    applyOptimisticRemark(stage.title, trimmed);
+    setDraft('');
+    Keyboard.dismiss();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fade,
+        transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+      }}>
+      <View
+        className="mb-3 rounded-3xl bg-card px-4 py-4 dark:bg-card-dark"
+        style={{
+          shadowColor: '#0f172a',
+          shadowOpacity: isDark ? 0 : 0.05,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 5 },
+          elevation: isDark ? 0 : 1,
+        }}>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="flex-1 text-[15px] font-semibold text-slate-900 dark:text-white" numberOfLines={1}>
+            {stage.title}
+          </Text>
+          <View className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1" style={{ backgroundColor: meta.badgeBg }}>
+            <View className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
+            <Text className="text-xs font-semibold" style={{ color: meta.badgeText }}>
+              {meta.label}
+            </Text>
+          </View>
+        </View>
+
+        <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          {stage.updatedAt ? `Updated ${formatRelativeShort(stage.updatedAt)}` : 'Not started yet'}
+        </Text>
+
+        <View className="mt-2.5">
+          <Text className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Remark
+          </Text>
+          <View
+            className="mt-1 justify-center rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40"
+            style={{ minHeight: 52 }}>
+            {stage.latestRemark ? (
+              <Text className="text-sm text-slate-600 dark:text-slate-300">{stage.latestRemark}</Text>
+            ) : null}
+          </View>
+        </View>
+
+        <View className="mt-2 flex-row items-center gap-2">
+          <View className="flex-1 rounded-full border border-slate-100 bg-surface px-3.5 py-2 dark:border-slate-800 dark:bg-slate-900">
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Type your reply..."
+              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+              returnKeyType="send"
+              onSubmitEditing={handleSend}
+              className="text-sm text-slate-900 dark:text-white"
+            />
+          </View>
+          <Pressable
+            onPress={handleSend}
+            disabled={!draft.trim()}
+            hitSlop={6}
+            className="h-9 w-9 items-center justify-center rounded-full"
+            style={{ backgroundColor: draft.trim() ? '#0049B7' : isDark ? '#1e293b' : '#e2e8f0' }}>
+            <Ionicons name="send" size={15} color={draft.trim() ? '#ffffff' : isDark ? '#64748b' : '#94a3b8'} />
+          </Pressable>
+        </View>
+      </View>
+    </Animated.View>
   );
 }

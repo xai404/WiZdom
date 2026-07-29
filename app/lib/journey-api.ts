@@ -5,6 +5,7 @@ export type JourneyStageStatus = 'pending' | 'in_progress' | 'completed';
 export type JourneyStage = {
   title: string;
   status: JourneyStageStatus;
+  latestRemark: string | null;
   updatedAt: string | null;
 };
 

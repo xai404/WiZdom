@@ -14,12 +14,11 @@ export default function DrawerLayout() {
         swipeEdgeWidth: 40,
       }}>
       <Drawer.Screen name="dashboard" />
-      <Drawer.Screen name="my-journey" />
-      <Drawer.Screen name="documents" />
-      <Drawer.Screen name="messages" />
-      <Drawer.Screen name="notifications" />
+      <Drawer.Screen name="group-chat" />
       <Drawer.Screen name="profile" />
       <Drawer.Screen name="settings" />
+      <Drawer.Screen name="documents" />
+      <Drawer.Screen name="notifications" />
       <Drawer.Screen name="support" />
     </Drawer>
   );

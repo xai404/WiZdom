@@ -4,6 +4,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import '../global.css';
 import { AuthProvider } from '@/context/auth-context';
+import { ChatProvider } from '@/context/chat-context';
+import { JourneyProvider } from '@/context/journey-context';
 import { useAppTheme, useHydrateAppTheme } from '@/hooks/use-app-theme';
 
 function RootNavigation() {
@@ -26,7 +28,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <RootNavigation />
+        <JourneyProvider>
+          <ChatProvider>
+            <RootNavigation />
+          </ChatProvider>
+        </JourneyProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

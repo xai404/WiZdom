@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { useAuth } from '@/context/auth-context';
+import { useChat } from '@/context/chat-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
 type MenuItem = {
@@ -17,11 +18,8 @@ type MenuItem = {
 
 const MENU_ITEMS: MenuItem[] = [
   { icon: 'home-outline', label: 'Dashboard', route: '/dashboard' },
-  { icon: 'chatbubble-ellipses-outline', label: 'My Messages', route: '/messages' },
-  { icon: 'compass-outline', label: 'My Journey', route: '/my-journey' },
-  { icon: 'document-text-outline', label: 'My Documents', route: '/documents' },
-  { icon: 'notifications-outline', label: 'Notifications', route: '/notifications' },
-  { icon: 'person-outline', label: 'My Profile', route: '/profile' },
+  { icon: 'chatbubble-ellipses-outline', label: 'Group Chat', route: '/group-chat' },
+  { icon: 'person-outline', label: 'Profile', route: '/profile' },
   { icon: 'settings-outline', label: 'Settings', route: '/settings' },
 ];
 
@@ -34,6 +32,7 @@ function getInitials(name?: string) {
 
 export function DrawerContent(props: DrawerContentComponentProps) {
   const { user, logout } = useAuth();
+  const { unreadCount } = useChat();
   const { isDark, toggleTheme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -83,7 +82,12 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           {MENU_ITEMS.map((item) => (
             <PressableScale key={item.route} onPress={() => navigateTo(item.route)} scaleTo={0.98}>
               <View className="mb-1 flex-row items-center gap-4 rounded-2xl px-3 py-3.5">
-                <Ionicons name={item.icon} size={21} color={isDark ? '#8bb4fd' : '#0049B7'} />
+                <View>
+                  <Ionicons name={item.icon} size={21} color={isDark ? '#8bb4fd' : '#0049B7'} />
+                  {item.route === '/group-chat' && unreadCount > 0 ? (
+                    <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-600" />
+                  ) : null}
+                </View>
                 <Text className="text-[15px] font-medium text-slate-700 dark:text-slate-200">
                   {item.label}
                 </Text>
