@@ -11,7 +11,7 @@ const Dashboard = () => {
     return <SuperAdminDashboard />;
   }
 
-  // counsellor, application_team, editing_team all get the same simple dashboard for now
+  // admin/manager/staff-role employees all get the same simple dashboard for now
   return <SimpleDashboard />;
 };
 

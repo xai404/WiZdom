@@ -5,6 +5,10 @@ const BACKEND_PORT = 5000;
 const ANDROID_EMULATOR_URL = `http://10.0.2.2:${BACKEND_PORT}`;
 const LOCALHOST_URL = `http://localhost:${BACKEND_PORT}`;
 
+// Bare origin (no /api — every call site under app/lib appends its own
+// "/api/..." path), matching what a production backend build is deployed at.
+const PRODUCTION_API_ORIGIN = 'https://api.wizjobs.org';
+
 /**
  * When running through Metro (Expo Go / dev client), Constants exposes the
  * LAN address the bundler was loaded from (e.g. "192.168.0.115:8081"). A
@@ -22,6 +26,11 @@ function resolveApiBaseUrl(): string {
 
   const devHost = getDevServerHost();
   if (devHost) return `http://${devHost}:${BACKEND_PORT}`;
+
+  // No dev server (Metro) attached and no explicit override — this is a
+  // release build (TestFlight/Play Store/EAS production profile), not a
+  // local dev client, so point at the deployed backend instead of localhost.
+  if (!__DEV__) return PRODUCTION_API_ORIGIN;
 
   return Platform.OS === 'android' ? ANDROID_EMULATOR_URL : LOCALHOST_URL;
 }

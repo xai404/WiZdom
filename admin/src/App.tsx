@@ -4,10 +4,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Unauthorized from './pages/Unauthorized';
-import { ROLE_HOME_PATH } from './config/roles';
+import { ROLE_HOME_PATH, STAFF_ROLES } from './config/roles';
 import Employees from './pages/Employees';
+import EmployeeForm from './pages/EmployeeForm';
 import EmployeeDetails from './pages/EmployeeDetails';
 import Students from './pages/Students';
+import StudentForm from './pages/StudentForm';
+import MyProfile from './pages/MyProfile';
 
 const RootRedirect = () => {
   const { user, isLoading } = useAuth();
@@ -36,8 +39,29 @@ function App() {
           <Route
             path="/employees"
             element={
-              <ProtectedRoute allowedRoles={['super_admin', 'counsellor', 'application_team']}>
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
                 <Employees />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/employees/new"
+            element={
+              <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+                <EmployeeForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/employees/edit"
+            element={
+              // Any staff role may reach the edit page — EmployeeForm itself
+              // further restricts to "editing self" or an admin/super_admin
+              // role, matching the backend's requireRoleOrSelf check.
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
+                <EmployeeForm />
               </ProtectedRoute>
             }
           />
@@ -45,17 +69,44 @@ function App() {
           <Route
             path="/students"
             element={
-              <ProtectedRoute allowedRoles={['super_admin', 'counsellor', 'application_team']}>
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
                 <Students />
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/admin/employees/:id"
+            path="/students/new"
             element={
-              <ProtectedRoute allowedRoles={['super_admin']}>
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
+                <StudentForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/students/edit"
+            element={
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
+                <StudentForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/employees/view"
+            element={
+              <ProtectedRoute allowedRoles={STAFF_ROLES}>
                 <EmployeeDetails />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/my-profile"
+            element={
+              <ProtectedRoute>
+                <MyProfile />
               </ProtectedRoute>
             }
           />

@@ -1,0 +1,96 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Text, View } from 'react-native';
+
+import { useJourney } from '@/context/journey-context';
+import { useAppTheme } from '@/hooks/use-app-theme';
+
+const PRIMARY = '#0049B7';
+const GOLD = '#f59e0b';
+
+// Goal-gradient framing — the closer a student is to finishing, the more
+// specifically the copy calls that out, since motivation to finish a task
+// rises as the perceived remaining distance shrinks. Deliberately not
+// generic filler at every step.
+function motivationalLine(fraction: number, remaining: number): string {
+  if (fraction >= 1) return "You're all done! 🎉";
+  if (fraction === 0) return 'Every journey starts with one step — let’s begin! 🚀';
+  if (remaining === 1) return 'Just 1 step left — the finish line is right there!';
+  if (fraction >= 0.75) return `So close! Only ${remaining} steps stand between you and done.`;
+  if (fraction >= 0.5) return "You're over halfway there — keep this momentum going!";
+  if (fraction >= 0.25) return 'Great start — every step you finish makes the next one faster.';
+  return "You're building momentum — let's keep it moving!";
+}
+
+// Shared by the Progress screen and the Dashboard so both show the exact
+// same overall-progress summary — trophy, animated bar, and the "X of Y
+// stages completed • Only N left" line. Self-contained (reads useJourney()
+// itself) so either screen can just drop it in with no prop wiring.
+export function JourneyHeroCard() {
+  const { journey } = useJourney();
+  const { isDark } = useAppTheme();
+  const barWidth = useRef(new Animated.Value(0)).current;
+
+  const completed = journey?.filter((s) => s.status === 'completed').length ?? 0;
+  const total = journey?.length ?? 0;
+  const remaining = total - completed;
+  const fraction = total > 0 ? completed / total : 0;
+
+  useEffect(() => {
+    Animated.timing(barWidth, { toValue: fraction, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [fraction, barWidth]);
+
+  const widthPct = barWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+
+  if (!journey || journey.length === 0) return null;
+
+  return (
+    <View
+      className="mb-4 rounded-3xl px-5 py-5 dark:bg-card-dark"
+      style={{
+        backgroundColor: isDark ? undefined : '#ffffff',
+        shadowColor: '#0049B7',
+        shadowOpacity: isDark ? 0 : 0.08,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: isDark ? 0 : 3,
+      }}>
+      <View className="flex-row items-start justify-between">
+        <View>
+          <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Overall Progress
+          </Text>
+          <View className="mt-1 flex-row items-baseline gap-1.5">
+            <Text className="text-3xl font-extrabold" style={{ color: isDark ? '#8bb4fd' : PRIMARY }}>
+              {Math.round(fraction * 100)}%
+            </Text>
+            <Text className="text-sm font-semibold text-slate-400 dark:text-slate-500">Completed</Text>
+          </View>
+        </View>
+
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: isDark ? 'rgba(245,158,11,0.15)' : '#fff7e6',
+          }}>
+          <Ionicons name="trophy" size={24} color={GOLD} />
+        </View>
+      </View>
+
+      <View className="mt-4" style={{ height: 8, borderRadius: 4, backgroundColor: isDark ? '#1c2740' : '#eef2f7', overflow: 'hidden' }}>
+        <Animated.View style={{ height: '100%', width: widthPct, borderRadius: 4, backgroundColor: isDark ? '#8bb4fd' : PRIMARY }} />
+      </View>
+
+      <Text className="mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+        {completed} of {total} stages completed{remaining > 0 ? ` • Only ${remaining} step${remaining === 1 ? '' : 's'} left` : ''}
+      </Text>
+      <Text className="mt-1.5 text-[13px] font-bold" style={{ color: isDark ? '#8bb4fd' : PRIMARY }}>
+        {motivationalLine(fraction, remaining)}
+      </Text>
+    </View>
+  );
+}

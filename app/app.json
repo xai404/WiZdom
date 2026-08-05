@@ -31,14 +31,28 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/wizdom_logo.png",
-          "imageWidth": 160,
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#00132e",
           "dark": {
             "backgroundColor": "#00132e"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/wizdom_logo.png",
+          "color": "#0049B7"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow WiZdom to add support contacts to your phone's address book."
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, User, Trash2, ClipboardList } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Mail, Phone, Building2, Briefcase, Trash2, Pencil, ClipboardList } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
+import { useAuth } from '../context/AuthContext';
 import { fetchEmployeeById, deleteEmployee } from '../api/employees';
+import { Avatar, Badge, Button, Card, EMPLOYEE_ROLE_TONE } from '../components/ui';
 import type { Employee } from '../types';
 
 const EmployeeDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  // Id travels via router state, not a URL param, so it stays out of the
+  // address bar — see Employees.tsx's navigate(..., { state: { id } }).
+  const id = (location.state as { id?: string } | null)?.id;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canManageOthers = user?.role === 'super_admin' || user?.role === 'admin';
+  const canEditThis = canManageOthers || id === user?.id;
+  const canDelete = canManageOthers;
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
@@ -15,7 +24,13 @@ const EmployeeDetails = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      // Reached directly with no id to show (e.g. a refresh that lost
+      // router state, or a typed/bookmarked URL) — bounce back rather than
+      // getting stuck on an infinite loading spinner.
+      navigate('/employees', { replace: true });
+      return;
+    }
     setLoading(true);
     fetchEmployeeById(id)
       .then(setEmployee)
@@ -29,7 +44,7 @@ const EmployeeDetails = () => {
     setDeleting(true);
     try {
       await deleteEmployee(id);
-      navigate('/admin/employees');
+      navigate('/employees');
     } catch {
       setError('Could not delete this employee.');
       setDeleting(false);
@@ -39,7 +54,7 @@ const EmployeeDetails = () => {
   return (
     <DashboardLayout title="Employee Details" subtitle="View employee profile and activity.">
       <button
-        onClick={() => navigate('/admin/employees')}
+        onClick={() => navigate('/employees')}
         className="mb-5 flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-brand-600"
       >
         <ArrowLeft size={16} />
@@ -57,36 +72,43 @@ const EmployeeDetails = () => {
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           {/* Profile card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-1">
+          <Card glass className="p-6 lg:col-span-1">
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-2xl font-semibold text-brand-600">
-                {employee.name.charAt(0).toUpperCase()}
-              </div>
+              <Avatar name={employee.name} src={employee.profilePicture} size={80} className="mb-4 text-2xl" />
               <h2 className="text-lg font-semibold text-slate-800">{employee.name}</h2>
-              <span className="mt-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-                {employee.department}
-              </span>
+              <p className="mt-0.5 text-sm text-slate-400">{employee.designation || '—'}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Badge tone="slate">{employee.department}</Badge>
+                <Badge tone={EMPLOYEE_ROLE_TONE[employee.role ?? 'staff']}>{employee.role ?? 'staff'}</Badge>
+                <Badge tone={employee.isActive ? 'green' : 'slate'}>{employee.isActive ? 'Active' : 'Inactive'}</Badge>
+              </div>
             </div>
 
             <div className="mt-6 space-y-3">
               <DetailRow icon={Mail} label="Email" value={employee.email} />
               <DetailRow icon={Phone} label="Phone" value={employee.phone} />
               <DetailRow icon={Building2} label="Department" value={employee.department} />
-              <DetailRow icon={User} label="Employee ID" value={employee.id} />
+              <DetailRow icon={Briefcase} label="Designation" value={employee.designation || '—'} />
             </div>
 
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-            >
-              <Trash2 size={16} />
-              {deleting ? 'Deleting…' : 'Delete Employee'}
-            </button>
-          </div>
+            {(canEditThis || canDelete) && (
+              <div className="mt-6 flex gap-3">
+                {canEditThis && (
+                  <Button variant="secondary" icon={<Pencil size={16} />} className="flex-1" onClick={() => navigate('/employees/edit', { state: { id: employee.id } })}>
+                    Edit
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="danger" icon={<Trash2 size={16} />} className="flex-1" onClick={handleDelete} loading={deleting}>
+                    Delete
+                  </Button>
+                )}
+              </div>
+            )}
+          </Card>
 
           {/* Activity / assigned tasks */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-2">
+          <Card className="p-6 lg:col-span-2">
             <div className="mb-4 flex items-center gap-2">
               <ClipboardList size={18} className="text-brand-600" />
               <h3 className="text-base font-semibold text-slate-800">Assigned Tasks</h3>
@@ -99,7 +121,7 @@ const EmployeeDetails = () => {
                 activity history will appear here.
               </p>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </DashboardLayout>

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
 
 const adminSchema = new mongoose.Schema(
   {
@@ -27,8 +28,26 @@ role: {
   default: 'super_admin',
   immutable: true,
 },
+    phone: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    profilePicture: {
+      type: String,
+      default: null,
+    },
     lastLoginAt: {
       type: Date,
+    },
+    // Lockout bookkeeping — see utils/loginThrottle.js.
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }
@@ -36,6 +55,9 @@ role: {
 
 adminSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
+  if (!isStrongPassword(this.password)) {
+    return next(Object.assign(new Error(PASSWORD_POLICY_MESSAGE), { statusCode: 400 }));
+  }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
@@ -51,6 +73,8 @@ adminSchema.methods.toSafeObject = function toSafeObject() {
     name: this.name,
     email: this.email,
     role: this.role,
+    phone: this.phone,
+    profilePicture: this.profilePicture,
     createdAt: this.createdAt,
   };
 };

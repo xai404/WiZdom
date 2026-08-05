@@ -16,7 +16,8 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Pinned to block algorithm-confusion attacks.
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     req.user = { id: decoded.id, role: decoded.role };
     next();
   } catch (error) {
@@ -32,4 +33,29 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, requireRole };
+// Lets a request through if the caller's role is one of `roles`, OR the
+// caller is acting on their own account (route's :id param === their own
+// id) — e.g. any employee may edit themselves, but editing someone ELSE
+// still requires one of the privileged roles.
+const requireRoleOrSelf = (...roles) => (req, res, next) => {
+  const isSelf = req.user && req.params.id === req.user.id;
+  const hasRole = req.user && roles.includes(req.user.role);
+  if (!isSelf && !hasRole) {
+    throw new ApiError(403, 'You do not have permission to perform this action');
+  }
+  next();
+};
+
+// Blocks students only, rather than allowlisting specific staff role
+// strings — an Employee/Admin account should always have baseline access
+// to staff-only resources (like the employee directory) regardless of
+// their specific role value, including legacy role/department values that
+// predate the current enum and wouldn't match a strict allowlist.
+const blockStudents = (req, res, next) => {
+  if (!req.user || req.user.role === 'student') {
+    throw new ApiError(403, 'You do not have permission to perform this action');
+  }
+  next();
+};
+
+module.exports = { protect, requireRole, requireRoleOrSelf, blockStudents };

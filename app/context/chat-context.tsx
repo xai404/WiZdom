@@ -9,20 +9,27 @@ type ChatContextValue = {
   error: string | null;
   reload: () => void;
   unreadCount: number;
-  sendReply: (text: string, stage?: string | null) => Promise<void>;
+  sendReply: (text: string, stage?: string | null, replyTo?: string | null) => Promise<void>;
   markRead: () => void;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { token, isLoading: authLoading } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
+    // Auth is still restoring the persisted session from SecureStore —
+    // wait, don't judge "no token yet" as "session expired".
+    if (authLoading) return;
     if (!token) {
+      // Clear any previous student's data on logout — otherwise it lingers
+      // in memory and can flash briefly when a different student logs in
+      // on the same device before their own fetch resolves.
+      setMessages(null);
       setLoading(false);
       setError('Your session has expired. Please log in again.');
       return;
@@ -33,7 +40,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       .then(setMessages)
       .catch((err) => setError(err instanceof Error ? err.message : 'Something went wrong.'))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, authLoading]);
 
   useEffect(() => {
     reload();
@@ -45,7 +52,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   const sendReply = useCallback(
-    async (text: string, stage?: string | null) => {
+    async (text: string, stage?: string | null, replyTo?: string | null) => {
       const trimmed = text.trim();
       if (!trimmed || !token) return;
 
@@ -53,15 +60,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         _id: `local-${Date.now()}`,
         sender: 'student',
         senderName: 'You',
+        senderRole: null,
         text: trimmed,
         stage: stage ?? null,
         readByStudent: true,
+        readByAdmin: false,
+        fullyRead: false,
+        pinned: false,
+        deleted: false,
+        replyTo: replyTo ?? null,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...(prev ?? []), optimistic]);
 
       try {
-        const saved = await postChatReply(token, { text: trimmed, stage });
+        const saved = await postChatReply(token, { text: trimmed, stage, replyTo });
         setMessages((prev) => (prev ?? []).map((message) => (message._id === optimistic._id ? saved : message)));
       } catch {
         // Keep the optimistic message visible rather than yanking it away —

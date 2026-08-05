@@ -1,13 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { useNavigation } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 
+const PRIMARY = '#0049B7';
+const ACCENT = '#3B82F6';
+
+// Matches ChatHeader's gradient/shadow/rounded-corner treatment exactly —
+// used by Courses/Notifications/Profile/Settings so every screen in the
+// app shares the same header identity instead of this one being the old
+// plain white bar ChatHeader's own comment calls out.
 export function TopBar({ title }: { title?: string }) {
-  const navigation = useNavigation<DrawerNavigationProp<Record<string, object | undefined>>>();
   const { isDark, toggleTheme } = useAppTheme();
   const spin = useRef(new Animated.Value(isDark ? 1 : 0)).current;
 
@@ -24,32 +30,53 @@ export function TopBar({ title }: { title?: string }) {
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
   return (
-    <View className="flex-row items-center justify-between px-5 py-3">
-      <Pressable
-        onPress={() => navigation.toggleDrawer()}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel="Open menu"
-        className="h-11 w-11 items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
-        <Ionicons name="menu-outline" size={26} color={isDark ? '#f1f5f9' : '#0f172a'} />
-      </Pressable>
+    <LinearGradient
+      colors={isDark ? ['#00132e', '#0B1E45', PRIMARY] : ['#00132e', PRIMARY, ACCENT]}
+      start={{ x: 0.05, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        paddingTop: 14,
+        paddingBottom: 16,
+        paddingHorizontal: 12,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        shadowColor: '#0049B7',
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 8,
+      }}>
+      <View className="flex-row items-center justify-between">
+        {router.canGoBack() ? (
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10">
+            <Ionicons name="chevron-back" size={22} color="#ffffff" />
+          </Pressable>
+        ) : (
+          <View className="h-10 w-10" />
+        )}
 
-      {title ? (
-        <Text className="text-base font-semibold text-slate-900 dark:text-white">{title}</Text>
-      ) : (
-        <View />
-      )}
+        {title ? (
+          <Text className="text-[15.5px] font-bold tracking-tight text-white">{title}</Text>
+        ) : (
+          <View />
+        )}
 
-      <Pressable
-        onPress={handleToggleTheme}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel="Toggle dark mode"
-        className="h-11 w-11 items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
-        <Animated.View style={{ transform: [{ rotate }] }}>
-          <Ionicons name={isDark ? 'moon' : 'sunny'} size={22} color={isDark ? '#8bb4fd' : '#f59e0b'} />
-        </Animated.View>
-      </Pressable>
-    </View>
+        <Pressable
+          onPress={handleToggleTheme}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle dark mode"
+          className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10">
+          <Animated.View style={{ transform: [{ rotate }] }}>
+            <Ionicons name={isDark ? 'moon' : 'sunny'} size={19} color={isDark ? '#c7d8ff' : '#ffd166'} />
+          </Animated.View>
+        </Pressable>
+      </View>
+    </LinearGradient>
   );
 }

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_HOME_PATH } from '../config/roles';
+import { Button, Input } from '../components/ui';
 
 const Login = () => {
   const { login, user, isLoading } = useAuth();
@@ -38,8 +40,16 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500 px-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl shadow-brand-900/30 sm:p-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-linear-to-br from-brand-900 via-brand-700 to-brand-500 px-4">
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-brand-300/20 blur-3xl" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="relative w-full max-w-md rounded-4xl border border-white/40 bg-white/90 p-8 shadow-(--shadow-glass) backdrop-blur-xl sm:p-10"
+      >
         <div className="mb-8 flex flex-col items-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
             <GraduationCap size={28} />
@@ -49,45 +59,35 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@wizdom.com"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-            />
-          </div>
+          <Input
+            label="Email"
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder=" Enter your email"
+          />
 
-          <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-11 text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-              />
+          <Input
+            label="Password"
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            rightSlot={
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
-            </div>
-          </div>
+            }
+          />
 
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
@@ -95,16 +95,11 @@ const Login = () => {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 font-medium text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {submitting && <Loader2 size={18} className="animate-spin" />}
+          <Button type="submit" loading={submitting} className="w-full py-3">
             {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
+          </Button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

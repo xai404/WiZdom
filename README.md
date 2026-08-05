@@ -28,6 +28,20 @@ WiZdom/
 - A running MongoDB instance (local `mongod` or a connection string to Atlas/etc.)
 - For the mobile app: the Expo Go app on your phone, or an Android/iOS simulator
 
+## Quick start (all three at once)
+
+Once each part has its `.env` set up and dependencies installed (`npm run install:all` from the
+repo root installs backend, admin, and app in one go), start everything with a single command
+from the repo root:
+
+```bash
+npm run dev
+```
+
+This uses `concurrently` to run the backend (`nodemon`), the admin site (`vite`), and the Expo
+app together in one terminal, each with a colored, labeled output prefix. Use `npm run dev:backend`,
+`npm run dev:admin`, or `npm run dev:app` to run just one of them.
+
 ## 1. Backend
 
 ```bash

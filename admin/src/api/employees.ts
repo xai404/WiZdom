@@ -1,17 +1,37 @@
 import api from './client';
-import type { Employee, NewEmployee } from '../types';
+import type { Employee, EmployeeDepartment, EmployeeRole } from '../types';
+import type { PaginationMeta } from '../components/ui';
 
 const normalize = (emp: any): Employee => ({
-  id: emp._id,
+  id: emp._id ?? emp.id,
   name: emp.name,
   email: emp.email,
   phone: emp.phone,
   department: emp.department,
+  designation: emp.designation,
+  role: emp.role,
+  profilePicture: emp.profilePicture,
+  isActive: emp.isActive,
+  createdAt: emp.createdAt,
 });
 
-export const fetchEmployees = async (): Promise<Employee[]> => {
-  const res = await api.get('/employees');
-  return res.data.map(normalize);
+export interface FetchEmployeesParams {
+  search?: string;
+  department?: EmployeeDepartment | '';
+  role?: EmployeeRole | '';
+  status?: 'active' | 'inactive' | '';
+  page?: number;
+  limit?: number;
+}
+
+export interface FetchEmployeesResult {
+  data: Employee[];
+  pagination: PaginationMeta;
+}
+
+export const fetchEmployees = async (params: FetchEmployeesParams = {}): Promise<FetchEmployeesResult> => {
+  const res = await api.get('/employees', { params });
+  return { data: res.data.data.map(normalize), pagination: res.data.pagination };
 };
 
 export const fetchEmployeeById = async (id: string): Promise<Employee> => {
@@ -19,14 +39,31 @@ export const fetchEmployeeById = async (id: string): Promise<Employee> => {
   return normalize(res.data);
 };
 
-export const addEmployee = async (payload: NewEmployee): Promise<Employee> => {
-  try {
-    const res = await api.post('/employees', payload);
-    return normalize(res.data);
-  } catch (err: any) {
-    console.error('Backend said:', err.response?.data);
-    throw err;
-  }
+const toFormData = (payload: Record<string, unknown>): FormData => {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (value instanceof File) {
+      formData.append(key, value);
+    } else {
+      formData.append(key, String(value));
+    }
+  });
+  return formData;
+};
+
+export const addEmployee = async (payload: Record<string, unknown>): Promise<Employee> => {
+  const res = await api.post('/employees', toFormData(payload), {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return normalize(res.data);
+};
+
+export const updateEmployee = async (id: string, payload: Record<string, unknown>): Promise<Employee> => {
+  const res = await api.patch(`/employees/${id}`, toFormData(payload), {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return normalize(res.data);
 };
 
 export const deleteEmployee = async (id: string): Promise<void> => {

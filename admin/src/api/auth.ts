@@ -21,3 +21,13 @@ export const fetchCurrentUser = async () => {
   const { data } = await apiClient.get<MeResponse>('/auth/me');
   return data.user;
 };
+
+export const updateMyProfile = async (payload: { name: string; phone: string; profilePicture?: File | null }) => {
+  const formData = new FormData();
+  formData.append('name', payload.name);
+  formData.append('phone', payload.phone);
+  if (payload.profilePicture) formData.append('profilePicture', payload.profilePicture);
+
+  const { data } = await apiClient.patch<MeResponse>('/auth/me', formData);
+  return data.user;
+};

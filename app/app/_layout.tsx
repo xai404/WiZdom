@@ -1,11 +1,13 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import '../global.css';
 import { AuthProvider } from '@/context/auth-context';
 import { ChatProvider } from '@/context/chat-context';
 import { JourneyProvider } from '@/context/journey-context';
+import { NotificationsProvider } from '@/context/notifications-context';
 import { useAppTheme, useHydrateAppTheme } from '@/hooks/use-app-theme';
 
 function RootNavigation() {
@@ -26,14 +28,18 @@ function RootNavigation() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <JourneyProvider>
-          <ChatProvider>
-            <RootNavigation />
-          </ChatProvider>
-        </JourneyProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+          <JourneyProvider>
+            <ChatProvider>
+              <NotificationsProvider>
+                <RootNavigation />
+              </NotificationsProvider>
+            </ChatProvider>
+          </JourneyProvider>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
