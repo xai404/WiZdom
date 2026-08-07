@@ -80,17 +80,13 @@ shows Total Students / Active Students pulled from `/api/dashboard/stats`.
 
 ```bash
 cd app
-cp .env.example .env   # EXPO_PUBLIC_API_URL
 npm install
 npm start
 ```
 
 Then press `w` for web, `a` for Android, `i` for iOS (macOS only), or scan the QR code with
-Expo Go. Update `EXPO_PUBLIC_API_URL` in `.env` to match how the device reaches your backend:
-
-- Web / iOS simulator: `http://localhost:5000/api`
-- Android emulator: `http://10.0.2.2:5000/api`
-- Physical device: `http://<your-computer-LAN-IP>:5000/api`
+Expo Go. The app always talks to the deployed backend at `https://api.wizjobs.org`
+(see `app/constants/config.ts`) — there's no local-backend override.
 
 Since student accounts aren't self-serve yet, create one manually (an admin-facing "create
 student" flow is future scope) — for example from the `backend` folder:

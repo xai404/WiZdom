@@ -71,10 +71,17 @@ export default function GroupChatScreen() {
   const highlightOpacity = useRef(new Animated.Value(0)).current;
   const scrolledToStageRef = useRef<string | null>(null);
 
+  // Mirrors the Admin Panel's ChatTab poll (POLL_MS = 6500) — push delivery
+  // alone isn't reliable enough (Expo Go, OS battery optimizations, denied
+  // permissions), so poll while this screen is actually open, same as admin
+  // does while its chat tab is open.
   useFocusEffect(
     useCallback(() => {
+      reload();
       markRead();
-    }, [markRead])
+      const interval = setInterval(reload, 6500);
+      return () => clearInterval(interval);
+    }, [reload, markRead])
   );
 
   const items = useMemo<ListItem[]>(() => {

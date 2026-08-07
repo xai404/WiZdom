@@ -28,6 +28,12 @@ const getMyChat = asyncHandler(async (req, res) => {
     return m;
   });
 
+  // Without this, a cache sitting anywhere between the app and this
+  // endpoint (mobile OS network cache, intermediate proxy/CDN) can serve a
+  // stale response to a repeated identical GET — new messages then only
+  // ever appear after something forces a genuinely fresh request (e.g. a
+  // fresh login), not on a normal poll/refresh.
+  res.set('Cache-Control', 'no-store');
   res.status(200).json({ success: true, messages: withStatus });
 });
 

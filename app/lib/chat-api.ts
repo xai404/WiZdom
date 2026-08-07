@@ -41,6 +41,7 @@ export async function fetchMyChat(token: string): Promise<ChatMessage[]> {
   try {
     response = await fetch(`${API_BASE_URL}/api/student/chat`, {
       headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
     });
   } catch {
     throw new Error('Unable to reach the server. Check your connection and try again.');
