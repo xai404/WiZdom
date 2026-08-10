@@ -114,9 +114,6 @@ function emitChatMessage(message, studentId) {
 function emitProgressUpdate(studentId, stage) {
   if (!io) return;
 
-  // TEMP DEBUG — remove after progress-sync investigation is done.
-  console.log('[PROGRESS SOCKET] emitting', 'studentId:', studentId.toString(), 'event:', 'student:progress-updated');
-
   io.to(`student:${studentId}`).emit('student:progress-updated', {
     studentId: studentId.toString(),
     title: stage.title,

@@ -63,9 +63,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       status: JourneyStageStatus;
       updatedAt: string;
     }) => {
-      // TEMP DEBUG — remove after progress-sync investigation is done.
-      console.log('[PROGRESS SOCKET] received', 'studentId:', payload.studentId, 'currentStudentId:', user?.id);
-
       // Belt-and-suspenders: the backend already scopes this event to the
       // student's own room, but only act on it if it's actually for the
       // signed-in student.
@@ -85,9 +82,6 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         const next = prev.map((stage) =>
           stage.title === payload.title ? { ...stage, status: payload.status, updatedAt: payload.updatedAt } : stage
         );
-
-        // TEMP DEBUG — remove after progress-sync investigation is done.
-        console.log('[PROGRESS STATE] updated', JSON.stringify(next.find((s) => s.title === payload.title)));
 
         return next;
       });
