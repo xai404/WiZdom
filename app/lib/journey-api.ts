@@ -14,6 +14,7 @@ export async function fetchMyJourney(token: string): Promise<JourneyStage[]> {
   try {
     response = await fetch(`${API_BASE_URL}/api/student/journey`, {
       headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
     });
   } catch {
     throw new Error('Unable to reach the server. Check your connection and try again.');

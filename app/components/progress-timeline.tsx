@@ -55,6 +55,11 @@ export function ProgressTimeline() {
     return journey.filter((s) => s.status === filter);
   }, [journey, filter]);
 
+  // TEMP DEBUG — remove after progress-sync investigation is done.
+  useEffect(() => {
+    console.log('[PROGRESS SCREEN] rendered progress:', JSON.stringify(journey?.map((s) => ({ title: s.title, status: s.status }))));
+  }, [journey]);
+
   if (isInitialLoading) {
     return <LottieLoader label="Loading your progress…" />;
   }

@@ -37,6 +37,12 @@ const getMyJourney = asyncHandler(async (req, res) => {
     };
   });
 
+  // Same reasoning as studentChatController.getMyChat — without this, a
+  // cache sitting anywhere between the app and this endpoint (mobile OS
+  // network cache, intermediate proxy/CDN) can serve a stale response to a
+  // repeated identical GET, making a manual refresh look like it did
+  // nothing.
+  res.set('Cache-Control', 'no-store');
   res.status(200).json({ success: true, journey });
 });
 

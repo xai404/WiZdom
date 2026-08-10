@@ -63,24 +63,41 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       status: JourneyStageStatus;
       updatedAt: string;
     }) => {
+      // TEMP DEBUG — remove after progress-sync investigation is done.
+      console.log('[PROGRESS SOCKET] received', 'studentId:', payload.studentId, 'currentStudentId:', user?.id);
+
       // Belt-and-suspenders: the backend already scopes this event to the
       // student's own room, but only act on it if it's actually for the
       // signed-in student.
       if (user && payload.studentId !== user.id) return;
-      setJourney((prev) =>
-        prev
-          ? prev.map((stage) =>
-              stage.title === payload.title ? { ...stage, status: payload.status, updatedAt: payload.updatedAt } : stage
-            )
-          : prev
-      );
+
+      setJourney((prev) => {
+        if (!prev) {
+          // Cold-start race: this event arrived before the initial fetch
+          // resolved, so there's no array yet to patch a single stage
+          // into. Fall back to a full reload rather than silently
+          // dropping the update — reload() picks up the change once it
+          // resolves.
+          reload();
+          return prev;
+        }
+
+        const next = prev.map((stage) =>
+          stage.title === payload.title ? { ...stage, status: payload.status, updatedAt: payload.updatedAt } : stage
+        );
+
+        // TEMP DEBUG — remove after progress-sync investigation is done.
+        console.log('[PROGRESS STATE] updated', JSON.stringify(next.find((s) => s.title === payload.title)));
+
+        return next;
+      });
     };
 
     socket.on('student:progress-updated', handleProgressUpdate);
     return () => {
       socket.off('student:progress-updated', handleProgressUpdate);
     };
-  }, [token, authLoading, user]);
+  }, [token, authLoading, user, reload]);
 
   // App-background/foreground fallback, mirroring chat-context's — the
   // socket connection itself is reconnected by chat-context's own
