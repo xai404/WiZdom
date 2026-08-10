@@ -23,7 +23,8 @@
       "permissions": [
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS"
-      ]
+      ],
+      "package": "com.appforwizdomsteam.wizdom"
     },
     "web": {
       "output": "static",

@@ -127,6 +127,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [reload]);
 
+  // App-wide fallback poll, independent of which screen (if any) is
+  // focused. group-chat.tsx already polls every 6.5s while it's actually
+  // open, which is redundant with this while Chat is on screen — that's
+  // fine, reload() is idempotent. The reason this exists is the *unread
+  // badge*: it's computed from this same `messages` state, but unlike an
+  // open Chat screen there's no other reconciliation path for it while the
+  // student is elsewhere in the app (e.g. Dashboard) — it would otherwise
+  // depend entirely on the socket connection (and, incidentally, on a push
+  // notification being received) to ever update. A longer interval than
+  // group-chat.tsx's, since this now runs continuously app-wide rather
+  // than only while one screen is open.
+  useEffect(() => {
+    if (authLoading || !token) return;
+    const interval = setInterval(reload, 20000);
+    return () => clearInterval(interval);
+  }, [token, authLoading, reload]);
+
   const unreadCount = useMemo(
     () => messages?.filter((message) => message.sender === 'admin' && !message.readByStudent).length ?? 0,
     [messages]

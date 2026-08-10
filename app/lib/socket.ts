@@ -31,6 +31,14 @@ export function connectSocket(token: string): Socket {
     reconnectionDelayMax: 10000,
   });
 
+  // Connection-state visibility — cheap and non-functional, but the only
+  // way to tell "socket never connected on this device/build" apart from
+  // "connected fine, something else is wrong" when debugging a report like
+  // "real-time isn't updating". Safe to leave in permanently.
+  socket.on('connect', () => console.log('[socket] connected', socket?.id));
+  socket.on('disconnect', (reason) => console.log('[socket] disconnected:', reason));
+  socket.on('connect_error', (err) => console.log('[socket] connect_error:', err.message));
+
   return socket;
 }
 

@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const { JOURNEY_STAGES } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { resolveAccount } = require('../utils/resolveAccount');
+const { emitProgressUpdate } = require('../socket');
 
 const STATUS_LABELS = {
   pending: 'Pending',
@@ -50,12 +51,13 @@ const updateStudentJourneyStage = asyncHandler(async (req, res) => {
   const student = await Student.findById(req.params.id).select('name journey pushTokens updatedBy');
   if (!student) throw new ApiError(404, 'Student not found');
 
+  const updatedAt = new Date();
   const existing = student.journey.find((stage) => stage.title === title);
   if (existing) {
     existing.status = status;
-    existing.updatedAt = new Date();
+    existing.updatedAt = updatedAt;
   } else {
-    student.journey.push({ title, status, updatedAt: new Date() });
+    student.journey.push({ title, status, updatedAt });
   }
 
   student.updatedBy = await resolveAccount(req.user);
@@ -74,6 +76,9 @@ const updateStudentJourneyStage = asyncHandler(async (req, res) => {
     body: `${title} is now ${STATUS_LABELS[status]}.`,
     stage: title,
   });
+
+  // Real-time push — only after the stage status is safely persisted above.
+  emitProgressUpdate(student._id, { title, status, updatedAt });
 
   res.status(200).json({ success: true, journey: student.journey });
 });

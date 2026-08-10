@@ -5,6 +5,7 @@ const Employee = require('../models/Employee');
 const ApiError = require('../utils/ApiError');
 const { JOURNEY_STAGES } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
+const { sendPushToStudent } = require('../utils/pushService');
 const { resolveAccount } = require('../utils/resolveAccount');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
 const { emitChatMessage } = require('../socket');
@@ -78,7 +79,7 @@ const postAdminMessage = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid department');
   }
 
-  const student = await Student.findById(req.params.id).select('name responsibleDepartment awaitingReply');
+  const student = await Student.findById(req.params.id).select('name responsibleDepartment awaitingReply pushTokens');
   if (!student) throw new ApiError(404, 'Student not found');
 
   if (replyTo) {
@@ -132,13 +133,20 @@ const postAdminMessage = asyncHandler(async (req, res) => {
     await Student.updateOne({ _id: student._id }, { $set: studentUpdate });
   }
 
-  await createNotification({
-    student: student._id,
-    type: stage ? 'remark' : 'message',
-    title: stage ? `New remark on ${stage}` : 'New message',
-    body: text.trim(),
-    stage: stage || null,
-  });
+  // Chat messages get a phone push (so the student is alerted even when
+  // the app isn't open) but deliberately do NOT create a Notification
+  // document the way stage/journey updates do — the in-app Notifications
+  // screen must only ever show journey/application updates, never chat
+  // content (chat already has its own real-time delivery + unread badge).
+  try {
+    await sendPushToStudent(student, {
+      title: stage ? `New remark on ${stage}` : 'New message',
+      body: text.trim(),
+      data: { type: 'chat_message', stage: stage || null },
+    });
+  } catch (err) {
+    console.error(`[adminChatController] push to student=${student._id} failed:`, err);
+  }
 
   if (departmentTagged) {
     await createNotification({

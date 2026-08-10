@@ -1,14 +1,6 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 
-// Same allowlist app.js uses for HTTP CORS — a browser (the Admin Panel)
-// must appear here; the mobile app and server-to-server calls send no
-// Origin header at all and are always allowed, same as app.js's cors().
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
 let io = null;
 
 // Verifies the JWT the same way authMiddleware.protect does, and attaches
@@ -39,13 +31,18 @@ function authenticateSocket(socket, next) {
 // used across the admin routes.
 function initSocket(httpServer) {
   io = new Server(httpServer, {
+    // Unlike the REST API's HTTP CORS (app.js), this deliberately reflects
+    // any Origin rather than checking against an allowlist. Origin is a
+    // browser-enforced concept — a non-browser client (the mobile app) can
+    // send whatever Origin string it likes, so checking it here blocks
+    // legitimate traffic (React Native's WebSocket sends the Metro dev
+    // server's own address as Origin, e.g. http://192.168.x.x:8081, which
+    // will essentially never match a hardcoded allowlist) without adding
+    // real protection against a forged one. The actual access control for
+    // sockets is the JWT check in authenticateSocket below, unaffected by
+    // this.
     cors: {
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-        return callback(new Error('Not allowed by CORS'));
-      },
+      origin: true,
       credentials: true,
     },
   });
@@ -110,9 +107,24 @@ function emitChatMessage(message, studentId) {
   io.to('staff').emit('chat:new-message', payload);
 }
 
+// Emits after a journey stage's status is saved — only the affected
+// student needs this; the admin who made the change already has the
+// result from the PATCH response, so (unlike chat) this doesn't also go
+// to the "staff" room.
+function emitProgressUpdate(studentId, stage) {
+  if (!io) return;
+
+  io.to(`student:${studentId}`).emit('student:progress-updated', {
+    studentId: studentId.toString(),
+    title: stage.title,
+    status: stage.status,
+    updatedAt: stage.updatedAt,
+  });
+}
+
 function getIO() {
   if (!io) throw new Error('Socket.IO has not been initialized yet');
   return io;
 }
 
-module.exports = { initSocket, getIO, emitChatMessage };
+module.exports = { initSocket, getIO, emitChatMessage, emitProgressUpdate };

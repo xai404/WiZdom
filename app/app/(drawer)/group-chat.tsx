@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -58,7 +58,8 @@ function getSenderDisplay(message: ChatMessage): string {
 export default function GroupChatScreen() {
   const params = useLocalSearchParams<{ stage?: string }>();
   const { isDark } = useAppTheme();
-  const { messages, loading, error, reload, sendReply, markRead } = useChat();
+  const { messages, loading, error, reload, sendReply, markRead, unreadCount } = useChat();
+  const isFocused = useIsFocused();
 
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -83,6 +84,16 @@ export default function GroupChatScreen() {
       return () => clearInterval(interval);
     }, [reload, markRead])
   );
+
+  // A message that arrives (e.g. via the real-time socket) while this
+  // screen is already open must be marked read immediately — otherwise
+  // the Chats tab badge (chat-context's unreadCount) would briefly tick up
+  // even though the student is looking straight at it. Gated on
+  // unreadCount so this only fires an actual markRead() call when there's
+  // something new to clear, not on every poll/render.
+  useEffect(() => {
+    if (isFocused && unreadCount > 0) markRead();
+  }, [isFocused, unreadCount, markRead]);
 
   const items = useMemo<ListItem[]>(() => {
     const source = messages ?? [];
