@@ -5,6 +5,7 @@ const ApiError = require('../utils/ApiError');
 const { JOURNEY_STAGES } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
+const { emitChatMessage } = require('../socket');
 
 // @desc    Get the current student's single Group Chat thread
 // @route   GET /api/student/chat
@@ -101,6 +102,9 @@ const postChatReply = asyncHandler(async (req, res) => {
   }
 
   const [withStatus] = attachReadStatus([message], await getActiveParticipantIds(req.user.id), req.user.id);
+
+  // Real-time push — only after the message is safely persisted above.
+  emitChatMessage(withStatus, req.user.id);
 
   res.status(201).json({ success: true, message: withStatus });
 });

@@ -6,6 +6,7 @@ import { IconButton } from '../ui';
 import { useInterval } from '../../hooks/useInterval';
 import { useAuth } from '../../context/AuthContext';
 import { deleteStudentChatMessage, fetchStudentChat, postStudentChatMessage, toggleMessagePin } from '../../api/students';
+import { getSocket } from '../../lib/socket';
 import ChatBubble from './ChatBubble';
 import ChatComposer from './ChatComposer';
 import MessageSearchBar from './MessageSearchBar';
@@ -109,6 +110,29 @@ const ChatTab = ({
       // Transient poll failures are silently ignored — the next tick retries.
     }
   }, POLL_MS);
+
+  // Real-time delivery — the poll above stays as a fallback/reconciliation
+  // mechanism (per the socket rollout plan) rather than being removed. The
+  // socket connection itself is owned by AuthContext (connected on
+  // login/session-restore, torn down on logout/401); this effect only
+  // attaches/detaches the message listener for whichever student is
+  // currently open, so switching students never leaves a stale listener
+  // reacting to the wrong thread.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewMessage = (incoming: ChatMessage & { studentId: string }) => {
+      if (incoming.studentId !== studentId) return;
+      setMessages((prev) => (prev.some((m) => m._id === incoming._id) ? prev : [...prev, incoming]));
+      onAfterChange();
+    };
+
+    socket.on('chat:new-message', handleNewMessage);
+    return () => {
+      socket.off('chat:new-message', handleNewMessage);
+    };
+  }, [studentId, setMessages, onAfterChange]);
 
   const handleSend = async (text: string, stage: string | null, replyToId: string | null, department: string | null) => {
     await postStudentChatMessage(studentId, text, stage, replyToId, department);

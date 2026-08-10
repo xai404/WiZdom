@@ -1,7 +1,9 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { useAuth } from '@/context/auth-context';
 import { fetchMyChat, markChatRead, postChatReply, type ChatMessage } from '@/lib/chat-api';
+import { connectSocket, getSocket } from '@/lib/socket';
 
 type ChatContextValue = {
   messages: ChatMessage[] | null;
@@ -16,7 +18,7 @@ type ChatContextValue = {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { token, isLoading: authLoading } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,13 +39,92 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     fetchMyChat(token)
-      .then(setMessages)
+      .then((fresh) => {
+        // A poll/focus refetch can land while an optimistic sendReply is
+        // still in flight (not yet confirmed by the server) — a blind
+        // overwrite here would wipe that bubble off the screen before the
+        // POST even resolves. Carry any still-pending (`local-` id)
+        // message forward; sendReply's own resolution replaces it with the
+        // real saved message once the POST completes.
+        setMessages((prev) => {
+          const pending = (prev ?? []).filter((m) => m._id.startsWith('local-'));
+          return pending.length ? [...fresh, ...pending] : fresh;
+        });
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Something went wrong.'))
       .finally(() => setLoading(false));
   }, [token, authLoading]);
 
   useEffect(() => {
     reload();
+  }, [reload]);
+
+  // Merges a message that arrived over the socket (or is being confirmed
+  // after an optimistic send) into state without ever producing a
+  // duplicate bubble:
+  //  - already present by real _id (e.g. a second delivery after a
+  //    reconnect, or this same message already landed via the REST
+  //    response) -> no-op.
+  //  - matches a still-pending `local-` optimistic placeholder (same
+  //    sender + text) -> replace the placeholder with the real message.
+  //  - otherwise -> append.
+  const applyIncomingMessage = useCallback((incoming: ChatMessage) => {
+    setMessages((prev) => {
+      const list = prev ?? [];
+      if (list.some((m) => m._id === incoming._id)) return list;
+
+      const localIndex = list.findIndex(
+        (m) => m._id.startsWith('local-') && m.sender === incoming.sender && m.text === incoming.text
+      );
+      if (localIndex !== -1) {
+        const next = [...list];
+        next[localIndex] = incoming;
+        return next;
+      }
+
+      return [...list, incoming];
+    });
+  }, []);
+
+  // Real-time delivery. The socket connection itself is owned by
+  // auth-context (connected on login/session-restore, torn down on
+  // logout); this effect only attaches/detaches the 'chat:new-message'
+  // listener, and re-asserts the connection defensively in case this
+  // effect mounts before auth-context's did. The 6.5s poll in
+  // group-chat.tsx stays in place as a fallback/reconciliation mechanism.
+  useEffect(() => {
+    if (authLoading || !token) return;
+
+    const socket = connectSocket(token);
+
+    const handleNewMessage = (incoming: ChatMessage & { studentId: string }) => {
+      // Belt-and-suspenders: the backend already scopes this event to the
+      // student's own room, but only act on it if it's actually for the
+      // signed-in student.
+      if (user && incoming.studentId !== user.id) return;
+      applyIncomingMessage(incoming);
+    };
+
+    socket.on('chat:new-message', handleNewMessage);
+    return () => {
+      socket.off('chat:new-message', handleNewMessage);
+    };
+  }, [token, authLoading, user, applyIncomingMessage]);
+
+  // App-background/foreground handling: RN can suspend the socket's
+  // underlying connection while backgrounded. On returning to the
+  // foreground, nudge it to reconnect if needed and reconcile via the
+  // normal REST fetch, rather than waiting for the next poll tick.
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState !== 'active') return;
+      const socket = getSocket();
+      if (socket && !socket.connected) socket.connect();
+      reload();
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
   }, [reload]);
 
   const unreadCount = useMemo(

@@ -7,6 +7,7 @@ const { JOURNEY_STAGES } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { resolveAccount } = require('../utils/resolveAccount');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
+const { emitChatMessage } = require('../socket');
 
 // @desc    Get a student's Group Chat thread (admin-side view of the same
 //          single shared conversation the Student App reads/writes).
@@ -151,6 +152,9 @@ const postAdminMessage = asyncHandler(async (req, res) => {
 
   const participantIds = await getActiveParticipantIds(student._id);
   const [withStatus] = attachReadStatus([message], participantIds, student._id);
+
+  // Real-time push — only after the message is safely persisted above.
+  emitChatMessage(withStatus, student._id);
 
   res.status(201).json({ success: true, message: withStatus });
 });

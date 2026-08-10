@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 import type { AuthUser } from '@/lib/auth-api';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 const TOKEN_KEY = 'wizdom_student_token';
 const USER_KEY = 'wizdom_student_user';
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const [storedToken, storedUser] = await Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]);
         if (cancelled) return;
         if (storedToken && storedUser) {
+          connectSocket(storedToken);
           setToken(storedToken);
           setUser(JSON.parse(storedUser) as AuthUser);
         }
@@ -75,12 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       isLoading,
       login: (nextUser: AuthUser, nextToken: string) => {
+        connectSocket(nextToken);
         setUser(nextUser);
         setToken(nextToken);
         storage.setItem(TOKEN_KEY, nextToken).catch(() => {});
         storage.setItem(USER_KEY, JSON.stringify(nextUser)).catch(() => {});
       },
       logout: () => {
+        disconnectSocket();
         setUser(null);
         setToken(null);
         storage.deleteItem(TOKEN_KEY).catch(() => {});

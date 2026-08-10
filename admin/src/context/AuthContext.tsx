@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { fetchCurrentUser, loginRequest } from '../api/auth';
 import { TOKEN_STORAGE_KEY } from '../api/client';
+import { connectSocket, disconnectSocket } from '../lib/socket';
 import type { AuthUser, UserRole } from '../types';
 
 interface AuthContextValue {
@@ -26,10 +27,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    connectSocket(token);
+
     fetchCurrentUser()
       .then(setUser)
       .catch(() => {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
+        disconnectSocket();
         setUser(null);
       })
       .finally(() => setIsLoading(false));
@@ -43,12 +47,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    connectSocket(token);
     setUser(loggedInUser);
     return loggedInUser;
   };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    disconnectSocket();
     setUser(null);
   };
 
