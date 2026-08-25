@@ -2,18 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
 
-const DEPARTMENTS = [
-  'Counselling',
-  'Documentation',
-  'Application',
-  'Editing',
-  'Finance',
-  'Visa',
-  'Admin',
-  'Marketing',
-  'Human Resources',
-  'Support',
-];
+const DEPARTMENTS = ['Editing', 'Application', 'Counselling', 'Admin', 'Visa', 'Finance'];
 
 const employeeSchema = new mongoose.Schema(
   {

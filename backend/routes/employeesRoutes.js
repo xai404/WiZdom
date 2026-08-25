@@ -8,6 +8,7 @@ const {
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  getActiveDepartments,
 } = require('../controllers/employeesController');
 
 // Any non-student account (super_admin or any Employee, whatever their
@@ -19,6 +20,8 @@ router.use(protect, blockStudents);
 // employee (create/edit/deactivate/delete); every other role may only view
 // the directory and edit their own record — see requireRoleOrSelf below.
 const PRIVILEGED_ROLES = ['super_admin', 'admin'];
+
+router.get('/departments/active', getActiveDepartments);
 
 router
   .route('/')

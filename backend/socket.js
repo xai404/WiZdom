@@ -90,10 +90,11 @@ function buildChatMessagePayload(message, studentId) {
 // Emits a just-saved chat message to the student's own room and to every
 // connected staff member, in both directions (admin-sent and
 // student-sent) — called only after Message.create() has already
-// succeeded. senderId/department are staff-only metadata (see
-// studentChatController.getMyChat's `.select('-department')` and its
-// `delete m.senderId`), so the student-room copy strips them the same way
-// the REST response already does.
+// succeeded. senderId is always staff-only metadata. `department` is
+// staff-only ONLY when an admin set it (internal routing); a department the
+// STUDENT themselves tagged is their own choice, so it's kept for the
+// student-room copy — same split as studentChatController.getMyChat's
+// `delete m.department` (admin-only) vs `delete m.senderId` (always).
 function emitChatMessage(message, studentId) {
   if (!io) return;
 
@@ -101,7 +102,7 @@ function emitChatMessage(message, studentId) {
 
   const studentPayload = { ...payload };
   delete studentPayload.senderId;
-  delete studentPayload.department;
+  if (studentPayload.sender === 'admin') delete studentPayload.department;
 
   io.to(`student:${studentId}`).emit('chat:new-message', studentPayload);
   io.to('staff').emit('chat:new-message', payload);

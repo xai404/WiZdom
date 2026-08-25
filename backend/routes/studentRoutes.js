@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { getMyJourney } = require('../controllers/studentJourneyController');
 const { getMyChat, postChatReply, markChatRead } = require('../controllers/studentChatController');
+const { getActiveDepartments } = require('../controllers/employeesController');
 const {
   getMyNotifications,
   markNotificationRead,
@@ -28,6 +29,11 @@ router.get('/journey', protect, requireRole('student'), getMyJourney);
 router.get('/chat', protect, requireRole('student'), getMyChat);
 router.post('/chat/reply', protect, requireRole('student'), postChatReply);
 router.post('/chat/read', protect, requireRole('student'), markChatRead);
+
+// Departments the "tag a team" picker should offer — only ones with an
+// active employee to actually pick the tag up. See
+// employeesController.getActiveDepartments.
+router.get('/departments', protect, requireRole('student'), getActiveDepartments);
 
 router.get('/notifications', protect, requireRole('student'), getMyNotifications);
 router.post('/notifications/:id/read', protect, requireRole('student'), markNotificationRead);

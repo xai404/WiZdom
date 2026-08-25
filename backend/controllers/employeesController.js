@@ -170,4 +170,38 @@ const deleteEmployee = asyncHandler(async (req, res) => {
   res.json({ message: 'Employee deleted successfully' });
 });
 
-module.exports = { getEmployees, getEmployeeById, createEmployee, updateEmployee, deleteEmployee };
+// @desc   Departments that currently have at least one active employee —
+//         used to filter the chat "tag a team" pickers (Admin Panel's
+//         ChatComposer and the Student App's group-chat) down to teams that
+//         can actually pick the tag up. Tagging a department nobody staffs
+//         (e.g. "Visa" with zero active employees) would set
+//         Student.awaitingReply/responsibleDepartment and then never auto-
+//         resolve — postAdminMessage/postChatReply only clear it when an
+//         employee FROM that department replies, so an empty department is
+//         a dead end, not just an empty inbox.
+// @route  GET /api/employees/departments/active
+// @access Private — any staff role, and (via studentRoutes.js pointing at
+//         this same handler) any signed-in student.
+const getActiveDepartments = asyncHandler(async (req, res) => {
+  // { $ne: false }, not { isActive: true }: distinct() is a raw query, so
+  // it never applies the schema's `default: true` the way a hydrated
+  // document does — an employee record from before this field existed has
+  // it missing (not `true`) in storage, which `{ isActive: true }` would
+  // silently treat as unstaffed even though the Admin Panel's own employee
+  // list shows that same record as Active.
+  const staffed = new Set(await Employee.distinct('department', { isActive: { $ne: false } }));
+  // Filtered against the canonical DEPARTMENTS list (rather than returned
+  // as-is) so the result stays in a stable, known order instead of
+  // whatever order Mongo's distinct() happens to return.
+  const departments = Employee.DEPARTMENTS.filter((d) => staffed.has(d));
+  res.json({ success: true, departments });
+});
+
+module.exports = {
+  getEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  getActiveDepartments,
+};

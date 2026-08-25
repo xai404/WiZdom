@@ -21,9 +21,11 @@ import { ChatHeader } from '@/components/chat-header';
 import { EmptyState } from '@/components/empty-state';
 import { LottieLoader } from '@/components/lottie-loader';
 import { getStageMetaBySlug, getStageMetaByTitle } from '@/constants/journey-meta';
+import { useAuth } from '@/context/auth-context';
 import { useChat } from '@/context/chat-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import type { ChatMessage } from '@/lib/chat-api';
+import { fetchActiveDepartments } from '@/lib/departments-api';
 import { formatDateSeparator, formatMessageTime } from '@/lib/format-date';
 
 const PRIMARY = '#0049B7';
@@ -58,11 +60,25 @@ function getSenderDisplay(message: ChatMessage): string {
 export default function GroupChatScreen() {
   const params = useLocalSearchParams<{ stage?: string }>();
   const { isDark } = useAppTheme();
+  const { token } = useAuth();
   const { messages, loading, error, reload, sendReply, markRead, unreadCount } = useChat();
   const isFocused = useIsFocused();
 
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [taggedDepartment, setTaggedDepartment] = useState<string | null>(null);
+  const [showDeptPicker, setShowDeptPicker] = useState(false);
+  // Starts empty and is populated only from GET /api/student/departments —
+  // never falls back to the full DEPARTMENTS list, staffed or not. Tagging
+  // an unstaffed department would open an "awaiting reply" nothing can ever
+  // auto-resolve, so the picker must only ever offer departments the fetch
+  // actually confirmed have an active employee. See lib/departments-api.ts.
+  const [taggableDepartments, setTaggableDepartments] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchActiveDepartments(token).then(setTaggableDepartments);
+  }, [token]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
@@ -184,9 +200,11 @@ export default function GroupChatScreen() {
 
   const handleSend = () => {
     if (!draft.trim()) return;
-    sendReply(draft, replyingTo?.stage ?? null, replyingTo?._id ?? null);
+    sendReply(draft, replyingTo?.stage ?? null, replyingTo?._id ?? null, taggedDepartment);
     setDraft('');
     setReplyingTo(null);
+    setTaggedDepartment(null);
+    setShowDeptPicker(false);
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
@@ -337,6 +355,69 @@ export default function GroupChatScreen() {
           </View>
         ) : null}
 
+        {taggedDepartment && !showDeptPicker ? (
+          <View
+            className="mx-3 mb-1 flex-row items-center gap-2 rounded-2xl px-3.5 py-2"
+            style={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.85)' : '#ffffff',
+              shadowColor: '#0f172a',
+              shadowOpacity: isDark ? 0 : 0.06,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: isDark ? 0 : 2,
+            }}>
+            <Ionicons name="pricetag" size={14} color={PRIMARY} />
+            <Text className="flex-1 text-xs font-semibold text-brand-600 dark:text-brand-300">
+              Tagging {taggedDepartment} Team
+            </Text>
+            <Pressable onPress={() => setTaggedDepartment(null)} hitSlop={8}>
+              <Ionicons name="close" size={16} color={isDark ? '#94a3b8' : '#64748b'} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {showDeptPicker ? (
+          <View
+            className="mx-3 mb-1 rounded-2xl px-2.5 py-2.5"
+            style={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.85)' : '#ffffff',
+              shadowColor: '#0f172a',
+              shadowOpacity: isDark ? 0 : 0.06,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: isDark ? 0 : 2,
+            }}>
+            <Text className="mb-2 ml-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              Tag a team
+            </Text>
+            {taggableDepartments.length === 0 ? (
+              <Text className="ml-1 text-xs text-slate-400 dark:text-slate-500">No teams available right now.</Text>
+            ) : (
+              <View className="flex-row flex-wrap gap-1.5">
+                {taggableDepartments.map((dept) => {
+                  const selected = taggedDepartment === dept;
+                  return (
+                    <Pressable
+                      key={dept}
+                      onPress={() => {
+                        setTaggedDepartment(selected ? null : dept);
+                        setShowDeptPicker(false);
+                      }}
+                      className="rounded-full px-3 py-1.5"
+                      style={{ backgroundColor: selected ? PRIMARY : isDark ? '#1e293b' : '#eef1f6' }}>
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: selected ? '#ffffff' : isDark ? '#cbd5e1' : '#475569' }}>
+                        @{dept}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
+
         {/* Premium floating composer. */}
         <View style={{ paddingHorizontal: 12, paddingBottom: 32, paddingTop: 4 }}>
           <View
@@ -349,6 +430,19 @@ export default function GroupChatScreen() {
               shadowOffset: { width: 0, height: 8 },
               elevation: 6,
             }}>
+            <Pressable
+              onPress={() => setShowDeptPicker((v) => !v)}
+              hitSlop={8}
+              className="h-9 w-9 items-center justify-center self-center rounded-full"
+              style={{ backgroundColor: taggedDepartment || showDeptPicker ? (isDark ? '#25324d' : '#eef5ff') : 'transparent' }}
+              accessibilityLabel="Tag a team">
+              <Ionicons
+                name="pricetag-outline"
+                size={18}
+                color={taggedDepartment || showDeptPicker ? PRIMARY : isDark ? '#64748b' : '#94a3b8'}
+              />
+            </Pressable>
+
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -649,6 +743,20 @@ function MessageBubbleContent({
           <Ionicons name={stageMeta.icon} size={12} color={isAdmin ? (isDark ? '#8bb4fd' : '#0049B7') : '#ffffff'} />
           <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#8bb4fd' : '#0049B7') : '#ffffff' }}>
             {stageMeta.title}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Only ever present on the student's own sent messages — admin-tagged
+          departments are internal routing and stripped before this ever
+          reaches the app (see studentChatController.getMyChat). */}
+      {message.department ? (
+        <View
+          className="mb-1.5 flex-row items-center gap-1.5 self-start rounded-full px-3 py-1"
+          style={{ backgroundColor: isAdmin ? (isDark ? '#25324d' : '#eef5ff') : 'rgba(255,255,255,0.18)' }}>
+          <Ionicons name="pricetag" size={12} color={isAdmin ? (isDark ? '#8bb4fd' : '#0049B7') : '#ffffff'} />
+          <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#8bb4fd' : '#0049B7') : '#ffffff' }}>
+            {message.department} Team
           </Text>
         </View>
       ) : null}
