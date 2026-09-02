@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TopBar } from '@/components/top-bar';
+import { PRIVACY_POLICY_URL } from '@/constants/config';
 import { useAuth } from '@/context/auth-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatShortDate } from '@/lib/format-date';
@@ -162,6 +164,16 @@ export default function ProfileScreen() {
               color="#ef4444"
               style={{ marginTop: 12 }}
             />
+
+            <Pressable
+              onPress={() => {
+                WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL).catch(() => {});
+              }}
+              hitSlop={8}
+              className="mt-5 flex-row items-center justify-center gap-1.5 py-1 active:opacity-70">
+              <Ionicons name="shield-checkmark-outline" size={13} color={isDark ? '#64748b' : '#94a3b8'} />
+              <Text className="text-[12.5px] font-medium text-slate-400 dark:text-slate-500">Privacy Policy</Text>
+            </Pressable>
           </View>
         </Animated.View>
       </ScrollView>

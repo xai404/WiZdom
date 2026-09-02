@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TopBar } from '@/components/top-bar';
+import { PRIVACY_POLICY_URL } from '@/constants/config';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
 function SettingsRow({
@@ -104,7 +106,15 @@ export default function SettingsScreen() {
           />
           <SettingsRow index={1} icon="notifications-outline" label="Notification preferences" />
           <SettingsRow index={2} icon="shield-checkmark-outline" label="Privacy & security" />
-          <SettingsRow index={3} icon="information-circle-outline" label="About WiZdom" />
+          <SettingsRow
+            index={3}
+            icon="document-text-outline"
+            label="Privacy Policy"
+            onPress={() => {
+              WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL).catch(() => {});
+            }}
+          />
+          <SettingsRow index={4} icon="information-circle-outline" label="About WiZdom" />
         </View>
       </ScrollView>
     </SafeAreaView>

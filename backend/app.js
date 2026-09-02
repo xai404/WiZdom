@@ -46,6 +46,21 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'WiZdom API is running' });
 });
 
+// Publicly accessible Privacy Policy — no auth, no login. Linked from the
+// student app's Settings screen and used for the Google Play Console
+// "Privacy Policy" URL. Served from the backend because it is the one
+// piece of WiZdom web infrastructure that is always publicly reachable at
+// a stable URL (https://api.wizjobs.org/privacy-policy). The page is a
+// single self-contained HTML file with inline styles, so relax helmet's
+// default Content-Security-Policy for this one route to allow them.
+app.get('/privacy-policy', (req, res) => {
+  res.set(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+  );
+  res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
+});
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', authRoutes);
