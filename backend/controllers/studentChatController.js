@@ -6,7 +6,30 @@ const ApiError = require('../utils/ApiError');
 const { JOURNEY_STAGES } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
-const { emitChatMessage } = require('../socket');
+const { isDepartmentStaffed } = require('../utils/departments');
+const { emitChatMessage, emitChatMessageUpdated } = require('../socket');
+
+// Defense in depth for every student-initiated write path — a closed
+// student is normally force-logged-out the moment status flips (see
+// socket.js's emitStudentProfileUpdated + auth-context.tsx), but a session
+// that missed that push (app was offline) must still be refused here
+// rather than relying on the client.
+const assertAccountOpen = async (studentId) => {
+  const student = await Student.findById(studentId).select('status');
+  if (!student) throw new ApiError(404, 'Student not found');
+  if (student.status === 'Closed') {
+    throw new ApiError(403, 'Your account has been closed. Please contact your counsellor.');
+  }
+};
+
+// Broadcasts an in-place change to one of the student's own messages (edit
+// or soft-delete) so every staff chat view reflects it immediately rather
+// than on its next 6.5s poll.
+const broadcastMessageUpdate = async (message, studentId) => {
+  const participantIds = await getActiveParticipantIds(studentId);
+  const [withStatus] = attachReadStatus([message], participantIds, studentId);
+  emitChatMessageUpdated(withStatus, studentId);
+};
 
 // @desc    Get the current student's single Group Chat thread
 // @route   GET /api/student/chat
@@ -68,10 +91,23 @@ const postChatReply = asyncHandler(async (req, res) => {
   if (department && !Employee.DEPARTMENTS.includes(department)) {
     throw new ApiError(400, 'Invalid department');
   }
+  // An unstaffed department can never reply, so tagging it would strand the
+  // thread in "awaiting reply" forever — refuse it here rather than relying
+  // on the app to have hidden it from the picker.
+  if (department && !(await isDepartmentStaffed(department))) {
+    throw new ApiError(400, 'That team is not available right now. Please send without a tag.');
+  }
 
-  const student = await Student.findById(req.user.id).select('name responsibleDepartment awaitingReply');
+  const student = await Student.findById(req.user.id).select('name status responsibleDepartment awaitingReply');
   if (!student) {
     throw new ApiError(404, 'Student not found');
+  }
+  // Defense in depth — a closed student is normally force-logged-out the
+  // moment status flips (see socket.js's emitStudentProfileUpdated +
+  // auth-context.tsx), but a session that missed that push (app was
+  // offline) must still be refused here rather than relying on the client.
+  if (student.status === 'Closed') {
+    throw new ApiError(403, 'Your account has been closed. Please contact your counsellor.');
   }
 
   if (replyTo) {
@@ -93,32 +129,45 @@ const postChatReply = asyncHandler(async (req, res) => {
 
   const targetDepartment = department || student.responsibleDepartment;
 
-  // Notify the responsible department on *every* student message while
-  // they're the ones on the hook — not just the first message that reopens
-  // an already-resolved thread. Previously a student's second/third
-  // follow-up (sent while awaitingReply was already true) triggered no
-  // notification at all, which is what made the staff notification bell
-  // feel broken for an ongoing conversation.
-  if (targetDepartment) {
-    const update = { awaitingSinceMessageId: message._id };
-    if (department) {
-      update.responsibleDepartment = department;
-      update.awaitingReply = true;
-      update.awaitingSince = new Date();
-    } else if (!student.awaitingReply) {
-      update.awaitingReply = true;
-      update.awaitingSince = new Date();
-    }
-    await Student.updateOne({ _id: student._id }, { $set: update });
+  // Every student message puts the thread into "awaiting" on the Admin
+  // Panel — someone on staff has to act. What CLEARS it differs:
+  //   - a department is on the hook -> only a reply from that department
+  //     (adminChatController.postAdminMessage)
+  //   - nobody is on the hook -> the first staff member to open the thread,
+  //     or any staff reply (adminChatController.getStudentChat /
+  //     postAdminMessage)
+  // Also bumps lastMessageAt so the Students list re-sorts this thread up.
+  const update = {
+    lastMessageAt: new Date(),
+    awaitingSinceMessageId: message._id,
+  };
 
-    await createNotification({
-      student: student._id,
-      type: 'department_tag',
-      title: `${targetDepartment} Team - new message`,
-      body: text.trim(),
-      department: targetDepartment,
-    });
+  // Don't restart an already-running wait timer just because the student
+  // sent a follow-up while still waiting — unless they explicitly (re-)tag
+  // a department, which is a fresh ask of that team.
+  if (!student.awaitingReply || department) {
+    update.awaitingReply = true;
+    update.awaitingSince = new Date();
   }
+  if (department) {
+    update.responsibleDepartment = department;
+  }
+
+  await Student.updateOne({ _id: student._id }, { $set: update });
+
+  // Every student message raises a staff notification (the admin bell), not
+  // just the first one that reopens a resolved thread and not just tagged
+  // threads. When a department is on the hook it's tagged to them; an
+  // untagged/brand-new student's message becomes a 'General' notification
+  // every staff account sees, so it can never land in a void nobody is
+  // alerted to. createNotification also fires the real-time socket nudge.
+  await createNotification({
+    student: student._id,
+    type: targetDepartment ? 'department_tag' : 'message',
+    title: targetDepartment ? `${targetDepartment} Team - new message` : `New message from ${student.name}`,
+    body: text.trim(),
+    department: targetDepartment || 'General',
+  });
 
   const [withStatus] = attachReadStatus([message], await getActiveParticipantIds(req.user.id), req.user.id);
 
@@ -139,4 +188,68 @@ const markChatRead = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-module.exports = { getMyChat, postChatReply, markChatRead };
+// @desc    Soft-delete one of the student's own Group Chat messages —
+//          mirrors adminChatController.deleteAdminMessage (same tombstone
+//          behavior), but scoped to sender:'student' so a student can only
+//          ever remove something they themselves sent, never a staff reply.
+// @route   DELETE /api/student/chat/:messageId
+// @access  Private/Student
+const deleteMyMessage = asyncHandler(async (req, res) => {
+  await assertAccountOpen(req.user.id);
+
+  const message = await Message.findOne({
+    _id: req.params.messageId,
+    student: req.user.id,
+    sender: 'student',
+  });
+  if (!message) throw new ApiError(404, 'Message not found');
+
+  if (!message.deleted) {
+    message.deleted = true;
+    await message.save();
+    await broadcastMessageUpdate(message, req.user.id);
+  }
+
+  res.status(200).json({ success: true, message });
+});
+
+// Same 10-minute "edit, but only briefly" window the Admin Panel enforces
+// on staff messages (see adminChatController.editAdminMessage).
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
+
+// @desc    Edit the text of one of the student's own Group Chat messages,
+//          within 10 minutes of sending it — mirrors
+//          adminChatController.editAdminMessage, scoped to sender:'student'
+//          so a student can only ever change their own words.
+// @route   PATCH /api/student/chat/:messageId
+// @access  Private/Student
+const editMyMessage = asyncHandler(async (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    throw new ApiError(400, 'Message text is required');
+  }
+
+  await assertAccountOpen(req.user.id);
+
+  const message = await Message.findOne({
+    _id: req.params.messageId,
+    student: req.user.id,
+    sender: 'student',
+  });
+  if (!message) throw new ApiError(404, 'Message not found');
+  if (message.deleted) {
+    throw new ApiError(400, 'Cannot edit a deleted message');
+  }
+  if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
+    throw new ApiError(400, 'The 10-minute edit window for this message has expired');
+  }
+
+  message.text = text.trim();
+  message.edited = true;
+  await message.save();
+  await broadcastMessageUpdate(message, req.user.id);
+
+  res.status(200).json({ success: true, message });
+});
+
+module.exports = { getMyChat, postChatReply, markChatRead, deleteMyMessage, editMyMessage };

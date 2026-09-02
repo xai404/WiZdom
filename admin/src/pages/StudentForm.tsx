@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Globe2, Lock, Mail, Phone, Sparkles, User, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, CreditCard, Globe2, Lock, Mail, Phone, Sparkles, User, Users, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../components/DashboardLayout';
-import { useAuth } from '../context/AuthContext';
 import { createStudent, fetchStudentById, updateStudent } from '../api/students';
 import { Badge, Button, Card, Input, Select } from '../components/ui';
-import { STUDENT_STATUSES, type StudentStatus } from '../types';
+import { PAYMENT_STATUSES, STUDENT_STATUSES, type PaymentStatus, type StudentStatus } from '../types';
 import { generateStrongPassword } from '../utils/generatePassword';
 
 const COUNTRIES = [
@@ -29,6 +28,8 @@ interface FormState {
   intakeMonth: string;
   intakeYear: string;
   status: StudentStatus;
+  groupName: string;
+  paymentStatus: PaymentStatus | '';
   password: string;
 }
 
@@ -40,6 +41,8 @@ const emptyForm: FormState = {
   intakeMonth: '',
   intakeYear: '',
   status: 'Active',
+  groupName: '',
+  paymentStatus: '',
   password: '',
 };
 
@@ -50,11 +53,6 @@ const StudentForm = () => {
   const id = (location.state as { id?: string } | null)?.id;
   const isEdit = location.pathname !== '/students/new';
   const navigate = useNavigate();
-  const { user } = useAuth();
-  // Deactivating/reactivating (the 'Inactive' status) is admin-only —
-  // every other status transition stays open to any employee — mirrors
-  // the backend's togglesAccountAccess check in updateStudent.
-  const isPrivileged = user?.role === 'super_admin' || user?.role === 'admin';
 
   const [form, setForm] = useState<FormState>(() =>
     isEdit ? emptyForm : { ...emptyForm, password: generateStrongPassword() }
@@ -82,6 +80,8 @@ const StudentForm = () => {
           intakeMonth: s.intakeMonth ? String(s.intakeMonth) : '',
           intakeYear: s.intakeYear ? String(s.intakeYear) : '',
           status: s.status ?? 'Active',
+          groupName: s.groupName ?? '',
+          paymentStatus: s.paymentStatus ?? '',
           password: '',
         });
       })
@@ -129,6 +129,8 @@ const StudentForm = () => {
         intakeMonth: form.intakeMonth ? Number(form.intakeMonth) : null,
         intakeYear: form.intakeYear ? Number(form.intakeYear) : null,
         status: form.status,
+        groupName: form.groupName,
+        paymentStatus: form.paymentStatus || null,
       };
 
       if (isEdit && id) {
@@ -178,25 +180,49 @@ const StudentForm = () => {
                 <Input label="Full Name" icon={<User size={16} />} value={form.name} onChange={(e) => set('name', e.target.value)} />
                 <Input label="Email" type="email" icon={<Mail size={16} />} value={form.email} onChange={(e) => set('email', e.target.value)} />
                 <Input label="Phone" type="tel" icon={<Phone size={16} />} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-                <Select
-                  label="Status"
-                  value={form.status}
-                  onChange={(e) => set('status', e.target.value as StudentStatus)}
-                  disabled={isEdit && !isPrivileged && form.status === 'Inactive'}
-                >
-                  {isEdit ? (
-                    STUDENT_STATUSES.filter((st) => isPrivileged || st !== 'Inactive').map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Deactivate</option>
-                    </>
+                <Input
+                  label="Group Name"
+                  icon={<Users size={16} />}
+                  value={form.groupName}
+                  onChange={(e) => set('groupName', e.target.value)}
+                />
+                <div>
+                  <Select
+                    label="Status"
+                    value={form.status}
+                    onChange={(e) => set('status', e.target.value as StudentStatus)}
+                    className={form.status === 'Closed' ? 'border-red-400 bg-red-50 font-semibold text-red-600' : ''}
+                  >
+                    {isEdit ? (
+                      // A legacy record may still hold a retired status
+                      // value ('Converted', 'Lead', 'Follow Up') — surface
+                      // it as an option so the Select doesn't silently
+                      // render the first entry ('Active') over the real,
+                      // unsaved value.
+                      (STUDENT_STATUSES as readonly string[]).includes(form.status)
+                        ? STUDENT_STATUSES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))
+                        : [form.status, ...STUDENT_STATUSES].map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))
+                    ) : (
+                      <>
+                        <option value="Active">Active</option>
+                        <option value="Closed">Deactivate</option>
+                      </>
+                    )}
+                  </Select>
+                  {form.status === 'Closed' && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      Closed accounts are deactivated — this student will not be able to log in to the app.
+                    </p>
                   )}
-                </Select>
+                </div>
               </div>
 
               <div>
@@ -252,6 +278,23 @@ const StudentForm = () => {
                     {YEAR_OPTIONS.map((y) => (
                       <option key={y} value={y}>
                         {y}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                    <CreditCard size={16} className="text-slate-400" />
+                    Payment Confirmation
+                  </label>
+                  <Select
+                    value={form.paymentStatus}
+                    onChange={(e) => set('paymentStatus', e.target.value as PaymentStatus | '')}
+                  >
+                    <option value="">Not set</option>
+                    {PAYMENT_STATUSES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
                       </option>
                     ))}
                   </Select>

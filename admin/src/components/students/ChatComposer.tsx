@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AtSign, Milestone, Paperclip, Send, Smile, X } from 'lucide-react';
 import { Button, IconButton, Select } from '../ui';
+import { fetchActiveDepartments } from '../../api/employees';
 import { EMPLOYEE_DEPARTMENTS } from '../../types';
 import type { ChatMessage } from '../../types';
 
@@ -16,6 +17,17 @@ const ChatComposer = ({ stages, replyingTo, onCancelReply, onSend }: ChatCompose
   const [stage, setStage] = useState('');
   const [department, setDepartment] = useState('');
   const [sending, setSending] = useState(false);
+  // Only departments with an active employee — tagging one nobody staffs
+  // would open an "awaiting reply" nothing can ever auto-resolve. Falls
+  // back to the full list while the fetch is in flight so the dropdown
+  // isn't empty on first render.
+  const [taggableDepartments, setTaggableDepartments] = useState<readonly string[]>(EMPLOYEE_DEPARTMENTS);
+
+  useEffect(() => {
+    fetchActiveDepartments()
+      .then(setTaggableDepartments)
+      .catch(() => {});
+  }, []);
 
   const handleSend = async () => {
     if (!text.trim() || sending) return;
@@ -53,7 +65,7 @@ const ChatComposer = ({ stages, replyingTo, onCancelReply, onSend }: ChatCompose
             className={`py-1.5! pl-8! text-xs! ${department ? 'font-medium text-brand-700' : 'text-slate-400'}`}
           >
             <option value="">Tag team…</option>
-            {EMPLOYEE_DEPARTMENTS.map((d) => (
+            {taggableDepartments.map((d) => (
               <option key={d} value={d}>
                 @{d}
               </option>

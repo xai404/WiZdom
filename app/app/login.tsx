@@ -192,7 +192,7 @@ export default function LoginScreen() {
     try {
       const response = await loginRequest(trimmedEmail, password);
       login(response.user, response.token);
-      router.replace('/dashboard');
+      router.replace({ pathname: '/dashboard', params: { justLoggedIn: '1' } } as never);
     } catch (err) {
       setToastMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
@@ -283,7 +283,7 @@ export default function LoginScreen() {
                           color: SKY,
                           textAlign: 'center',
                         }}>
-                        Study Abroad Portal
+                        Your Higher Education Journey App
                       </Text>
                       <Text
                         style={{
@@ -295,15 +295,6 @@ export default function LoginScreen() {
                           textAlign: 'center',
                         }}>
                         Welcome Back
-                      </Text>
-                      <Text
-                        style={{
-                          marginTop: 6,
-                          fontSize: 13.5,
-                          color: 'rgba(255,255,255,0.7)',
-                          textAlign: 'center',
-                        }}>
-                        Continue your study abroad journey.
                       </Text>
 
                       <View style={{ marginTop: 26, gap: 14 }}>

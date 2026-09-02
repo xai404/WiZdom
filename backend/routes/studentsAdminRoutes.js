@@ -13,6 +13,8 @@ const {
   getStudentChat,
   postAdminMessage,
   deleteAdminMessage,
+  editAdminMessage,
+  clearStudentChat,
   togglePinMessage,
 } = require('../controllers/adminChatController');
 
@@ -45,9 +47,10 @@ router
 router
   .route('/:id/chat')
   .get(getStudentChat)
-  .post(postAdminMessage);
+  .post(postAdminMessage)
+  .delete(requireRole(...PRIVILEGED_ROLES), clearStudentChat);
 
-router.route('/:id/chat/:messageId').delete(deleteAdminMessage);
+router.route('/:id/chat/:messageId').patch(editAdminMessage).delete(deleteAdminMessage);
 router.route('/:id/chat/:messageId/pin').patch(togglePinMessage);
 
 module.exports = router;

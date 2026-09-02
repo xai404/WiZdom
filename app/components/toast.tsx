@@ -6,9 +6,10 @@ type ToastProps = {
   message: string | null;
   onHide: () => void;
   duration?: number;
+  tone?: 'error' | 'success';
 };
 
-export function Toast({ message, onHide, duration = 3200 }: ToastProps) {
+export function Toast({ message, onHide, duration = 3200, tone = 'error' }: ToastProps) {
   const translateY = useRef(new Animated.Value(24)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -45,15 +46,22 @@ export function Toast({ message, onHide, duration = 3200 }: ToastProps) {
         pointerEvents: 'none',
       }}>
       <View
-        className="flex-row items-center gap-3 rounded-2xl bg-slate-900 px-5 py-4"
+        className="flex-row items-center gap-3 rounded-[20px] px-5 py-4"
         style={{
+          backgroundColor: '#0f172a',
+          borderWidth: 1,
+          borderColor: 'rgba(148,163,184,0.18)',
           shadowColor: '#000',
-          shadowOpacity: 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
+          shadowOpacity: 0.3,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 12 },
+          elevation: 10,
         }}>
-        <Ionicons name="alert-circle" size={20} color="#f87171" />
+        <Ionicons
+          name={tone === 'success' ? 'checkmark-circle' : 'alert-circle'}
+          size={20}
+          color={tone === 'success' ? '#4ade80' : '#f87171'}
+        />
         <Text className="flex-1 text-sm font-medium text-white">{message}</Text>
       </View>
     </Animated.View>

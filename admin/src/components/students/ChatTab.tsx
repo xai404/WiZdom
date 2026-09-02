@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { AtSign, Milestone, Pin, Search, UserCheck, X } from 'lucide-react';
+import { AtSign, Eraser, Lock, Milestone, Pin, Search, UserCheck, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { IconButton } from '../ui';
+import { Button, ConfirmDialog, IconButton } from '../ui';
 import { useInterval } from '../../hooks/useInterval';
 import { useAuth } from '../../context/AuthContext';
-import { deleteStudentChatMessage, fetchStudentChat, postStudentChatMessage, toggleMessagePin } from '../../api/students';
+import {
+  clearStudentChat,
+  deleteStudentChatMessage,
+  editStudentChatMessage,
+  fetchStudentChat,
+  postStudentChatMessage,
+  toggleMessagePin,
+} from '../../api/students';
 import { getSocket } from '../../lib/socket';
 import ChatBubble from './ChatBubble';
 import ChatComposer from './ChatComposer';
@@ -13,6 +20,13 @@ import MessageSearchBar from './MessageSearchBar';
 import type { ChatMessage, ResponseHandler } from '../../types';
 
 const POLL_MS = 6500;
+
+// What the poll compares tick-to-tick to decide whether the thread changed
+// and state needs replacing. Includes `text` and `edited` so an edit made
+// elsewhere (another admin, or the student from the app) is picked up, not
+// just new/deleted messages.
+const chatSignature = (messages: ChatMessage[]) =>
+  messages.map((m) => `${m._id}:${m.deleted ? 1 : 0}:${m.edited ? 1 : 0}:${m.text}`).join('|');
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
 
@@ -38,6 +52,10 @@ interface ChatTabProps {
   // Called after a send and on every poll tick — lets the parent re-pull
   // the student doc so the accountability header/card badge stay live.
   onAfterChange: () => void;
+  // Closed accounts reject writes server-side (adminChatController) too —
+  // this just replaces the composer with a WhatsApp-style "can't message
+  // this thread" banner so nobody has to hit send and get a 403 to find out.
+  isClosed: boolean;
 }
 
 const ChatTab = ({
@@ -50,13 +68,17 @@ const ChatTab = ({
   messages,
   setMessages,
   onAfterChange,
+  isClosed,
 }: ChatTabProps) => {
   const { user } = useAuth();
+  const canClearChat = user?.role === 'super_admin' || user?.role === 'admin';
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [pinnedListOpen, setPinnedListOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const bubbleRefs = useRef(new Map<string, HTMLDivElement>());
@@ -98,7 +120,7 @@ const ChatTab = ({
     if (document.hidden) return;
     try {
       const fresh = await fetchStudentChat(studentId);
-      const signature = fresh.map((m) => `${m._id}:${m.deleted ? 1 : 0}`).join(',');
+      const signature = chatSignature(fresh);
       if (signature !== signatureRef.current) {
         signatureRef.current = signature;
         setMessages(fresh);
@@ -128,16 +150,33 @@ const ChatTab = ({
       onAfterChange();
     };
 
+    // An existing message changed in place elsewhere — another admin (or the
+    // student) edited/deleted/pinned it. Replace by _id; never append.
+    const handleUpdatedMessage = (incoming: ChatMessage & { studentId: string }) => {
+      if (incoming.studentId !== studentId) return;
+      setMessages((prev) => prev.map((m) => (m._id === incoming._id ? incoming : m)));
+    };
+
+    const handleThreadCleared = (payload: { studentId: string }) => {
+      if (payload.studentId !== studentId) return;
+      setMessages([]);
+      onAfterChange();
+    };
+
     socket.on('chat:new-message', handleNewMessage);
+    socket.on('chat:message-updated', handleUpdatedMessage);
+    socket.on('chat:thread-cleared', handleThreadCleared);
     return () => {
       socket.off('chat:new-message', handleNewMessage);
+      socket.off('chat:message-updated', handleUpdatedMessage);
+      socket.off('chat:thread-cleared', handleThreadCleared);
     };
   }, [studentId, setMessages, onAfterChange]);
 
   const handleSend = async (text: string, stage: string | null, replyToId: string | null, department: string | null) => {
     await postStudentChatMessage(studentId, text, stage, replyToId, department);
     const fresh = await fetchStudentChat(studentId);
-    signatureRef.current = fresh.map((m) => `${m._id}:${m.deleted ? 1 : 0}`).join(',');
+    signatureRef.current = chatSignature(fresh);
     isAtBottomRef.current = true;
     setMessages(fresh);
     setReplyingToId(null);
@@ -149,9 +188,30 @@ const ChatTab = ({
     setMessages((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
   };
 
+  const handleEdit = async (messageId: string, text: string) => {
+    const updated = await editStudentChatMessage(studentId, messageId, text);
+    setMessages((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
+  };
+
   const handleTogglePin = async (messageId: string) => {
     const updated = await toggleMessagePin(studentId, messageId);
     setMessages((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
+  };
+
+  // Hard delete — every message is gone, including stage-tagged ones (which
+  // double as Journey tab remarks). setMessages([]) here is also what makes
+  // the Journey tab's remarks disappear immediately: StudentDetailPanel
+  // derives remarksByStage from this same messages array.
+  const handleClearChat = async () => {
+    setClearing(true);
+    try {
+      await clearStudentChat(studentId);
+      setMessages([]);
+      setClearConfirmOpen(false);
+      onAfterChange();
+    } finally {
+      setClearing(false);
+    }
   };
 
   const scrollToMessage = (id: string) => {
@@ -187,7 +247,19 @@ const ChatTab = ({
               </span>
             )}
           </div>
-          <IconButton icon={<Search size={15} />} label="Search messages" onClick={() => setSearchOpen(true)} />
+          <div className="flex shrink-0 items-center gap-1">
+            {canClearChat && (
+              <Button
+                size="sm"
+                variant="danger"
+                icon={<Eraser size={14} />}
+                onClick={() => setClearConfirmOpen(true)}
+              >
+                Clear chat
+              </Button>
+            )}
+            <IconButton icon={<Search size={15} />} label="Search messages" onClick={() => setSearchOpen(true)} />
+          </div>
         </div>
       )}
 
@@ -312,6 +384,7 @@ const ChatTab = ({
                   isAwaitingTarget={!!awaitingSinceMessageId && awaitingSinceMessageId === msg._id}
                   onReply={() => setReplyingToId(msg._id)}
                   onDelete={() => handleDelete(msg._id)}
+                  onEditSave={(text) => handleEdit(msg._id, text)}
                   onTogglePin={() => handleTogglePin(msg._id)}
                   onJumpToQuote={scrollToMessage}
                 />
@@ -321,11 +394,28 @@ const ChatTab = ({
         )}
       </div>
 
-      <ChatComposer
-        stages={stages}
-        replyingTo={replyingTo}
-        onCancelReply={() => setReplyingToId(null)}
-        onSend={handleSend}
+      {isClosed ? (
+        <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3.5 text-center text-sm text-slate-500">
+          <Lock size={14} className="shrink-0 text-slate-400" />
+          This student's account is closed — messaging is disabled.
+        </div>
+      ) : (
+        <ChatComposer
+          stages={stages}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingToId(null)}
+          onSend={handleSend}
+        />
+      )}
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        title="Clear this entire chat?"
+        description="Every message in this conversation will be permanently deleted, including any journey stage remarks that came from chat messages. This cannot be undone."
+        confirmLabel="Clear Chat"
+        loading={clearing}
+        onConfirm={handleClearChat}
+        onCancel={() => setClearConfirmOpen(false)}
       />
     </div>
   );

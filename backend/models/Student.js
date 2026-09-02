@@ -3,6 +3,150 @@ const bcrypt = require('bcryptjs');
 const Employee = require('./Employee');
 const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
 
+// Student Information Form — the raw notes staff collect from a student to
+// draft their LOR(s) and SOP, plus the study-preference answers carried
+// over from the CRM's public Student Interest Form (see interestFormSchema
+// below). All free text, filled on the admin Students panel's "SIF" tab
+// (studentsController.updateStudent) and the app's SIF screen. One LOR
+// block per recommender (a student usually needs 2-3); a single SOP block.
+const lorRecommenderSchema = new mongoose.Schema(
+  {
+    professorName: { type: String, trim: true, default: '' },
+    contactPhone: { type: String, trim: true, default: '' },
+    contactEmail: { type: String, trim: true, default: '' },
+    degreeStudied: { type: String, trim: true, default: '' },
+    cgpa: { type: String, trim: true, default: '' },
+    subjectsTopics: { type: String, trim: true, default: '' },
+    projects: { type: String, trim: true, default: '' },
+    internshipsActivities: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+// Study-preference answers the applicant already gave on the CRM's public
+// Student Interest Form (E:\CRM SifSubmission). Seeded onto a student at
+// account-provisioning time by the CRM (see E:\CRM\backend\services\
+// wizdomService.js) and thereafter editable by the student in the app and
+// by staff on the admin SIF tab, exactly like lor/sop. Enum-like values
+// (budget / preferredIntake / giftChoice) are kept as free strings so a
+// value whose CRM option list has since shifted is never rejected here.
+const interestFormSchema = new mongoose.Schema(
+  {
+    // The applicant's identity fields exactly as submitted on the CRM form —
+    // kept as a snapshot alongside the study preferences (distinct from the
+    // Student record's own name/email/phone, which drive login).
+    applicantName: { type: String, trim: true, default: '' },
+    mobile: { type: String, trim: true, default: '' },
+    email: { type: String, trim: true, default: '' },
+    preferredCountries: { type: [String], default: [] },
+    preferredStreams: { type: [String], default: [] },
+    budget: { type: String, trim: true, default: '' },
+    preferredIntake: { type: String, trim: true, default: '' },
+    hearAboutUs: { type: String, trim: true, default: '' },
+    giftChoice: { type: String, trim: true, default: '' },
+    entranceTestSupport: { type: [String], default: [] },
+    admissionSupport: { type: [String], default: [] },
+    alternateContact: { type: String, trim: true, default: '' },
+    agreedToTerms: { type: Boolean, default: false },
+    // Set once, by the CRM, when it first seeds this block. Left untouched
+    // by later student/admin edits — a marker of provenance, not a
+    // last-updated stamp (that's sifSchema.updatedAt).
+    sourcedFromCrmAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+// Personal / passport details the student fills in the app (the middle
+// block of the paper SIF, between the CRM interest form and the LOR/SOP
+// notes). All free text; dates stored as plain 'YYYY-MM-DD' strings so the
+// app's date pickers and the admin's <input type="date"> round-trip
+// without timezone drift.
+const personalDetailsSchema = new mongoose.Schema(
+  {
+    dateOfBirth: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    // 'yes' | 'no' | '' — has the student ever had a visa rejected.
+    previousVisaRejection: { type: String, trim: true, default: '' },
+    previousVisaRejectionDetails: { type: String, trim: true, default: '' },
+    emergencyContactName: { type: String, trim: true, default: '' },
+    emergencyContactRelationship: { type: String, trim: true, default: '' },
+    // 'Single' | 'Married' | ''
+    maritalStatus: { type: String, trim: true, default: '' },
+    spouseDetails: { type: String, trim: true, default: '' },
+    passportNumber: { type: String, trim: true, default: '' },
+    passportDateOfIssue: { type: String, trim: true, default: '' },
+    passportDateOfExpiry: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+// One row of the "Academic Qualification" table on the paper SIF. `level`
+// is a fixed row label (10, 11/12, Diploma, …) the UI seeds; the rest are
+// the student's entries.
+const academicQualificationSchema = new mongoose.Schema(
+  {
+    level: { type: String, trim: true, default: '' },
+    specializationSubjects: { type: String, trim: true, default: '' },
+    yearOfPassing: { type: String, trim: true, default: '' },
+    percentage: { type: String, trim: true, default: '' },
+    backlogs: { type: String, trim: true, default: '' },
+    schoolCollegeName: { type: String, trim: true, default: '' },
+    boardUniversity: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+// One row of the "Internship / Industry Experience" table.
+const internshipRowSchema = new mongoose.Schema(
+  {
+    nameOfEmployer: { type: String, trim: true, default: '' },
+    addressOfEmployer: { type: String, trim: true, default: '' },
+    designation: { type: String, trim: true, default: '' },
+    salaryMonthly: { type: String, trim: true, default: '' },
+    dateFrom: { type: String, trim: true, default: '' },
+    dateTo: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+// One row of the "Document Ready With You" checklist. `key` maps to the
+// fixed template the UIs seed; `ready` is 'yes' | 'no' | ''.
+const documentChecklistItemSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, default: '' },
+    name: { type: String, trim: true, default: '' },
+    format: { type: String, trim: true, default: '' },
+    ready: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const sifSchema = new mongoose.Schema(
+  {
+    lor: { type: [lorRecommenderSchema], default: [] },
+    // Study preferences carried over from the CRM Student Interest Form,
+    // pre-filled on conversion and then editable like everything else here.
+    interestForm: { type: interestFormSchema, default: () => ({}) },
+    // Personal / passport details + academic history + work experience +
+    // document checklist, filled by the student in the app and
+    // viewable/editable by staff on the admin SIF tab.
+    personalDetails: { type: personalDetailsSchema, default: () => ({}) },
+    academicQualifications: { type: [academicQualificationSchema], default: [] },
+    internshipExperience: { type: [internshipRowSchema], default: [] },
+    documentChecklist: { type: [documentChecklistItemSchema], default: [] },
+    sop: {
+      courseName: { type: String, trim: true, default: '' },
+      motivation: { type: String, trim: true, default: '' },
+      additionalInfo: { type: String, trim: true, default: '' },
+      expectationsToLearn: { type: String, trim: true, default: '' },
+      futurePlans: { type: String, trim: true, default: '' },
+    },
+    updatedAt: { type: Date, default: null },
+    updatedByName: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 const studentSchema = new mongoose.Schema(
   {
     name: {
@@ -48,7 +192,7 @@ const studentSchema = new mongoose.Schema(
     // never needs to know about this enum.
     status: {
       type: String,
-      enum: ['Active', 'Inactive', 'Converted', 'Lead', 'Follow Up', 'Closed'],
+      enum: ['Active', 'Inactive', 'Closed'],
       default: 'Active',
     },
     // Free-text "Counselled By" field — a name typed by whoever creates or
@@ -58,6 +202,20 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
+    },
+
+    // Free-text batch/cohort label — purely a display grouping (see
+    // StudentCard.tsx, which shows this above the student's own name), not
+    // tied to any other collection.
+    groupName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['Paid in Full', 'Half Payment', 'Free', null],
+      default: null,
     },
 
     // Denormalized snapshots of who created / last updated this student
@@ -125,7 +283,7 @@ const studentSchema = new mongoose.Schema(
           title: { type: String, required: true },
           status: {
             type: String,
-            enum: ['pending', 'in_progress', 'completed'],
+            enum: ['pending', 'in_progress', 'completed', 'rejected'],
             default: 'pending',
           },
           updatedAt: { type: Date, default: null },
@@ -181,6 +339,26 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Timestamp of the most recent Group Chat message in either direction —
+    // bumped by studentChatController.postChatReply and
+    // adminChatController.postAdminMessage on every send. Drives the
+    // Students list order (studentsController.getStudents sorts by this
+    // desc) so the most recently active conversation is always on top.
+    // Defaults to the record's own creation time so a brand-new student
+    // with no messages still sorts near the top rather than the bottom.
+    lastMessageAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // See sifSchema above — LOR/SOP intake notes, editable on the admin
+    // "SIF" tab. Admin-facing only (never included in the student-facing
+    // toSafeObject).
+    sif: {
+      type: sifSchema,
+      default: () => ({}),
+    },
   },
   { timestamps: true }
 );
@@ -231,6 +409,8 @@ studentSchema.methods.toSafeObject = function toSafeObject(includeAccountability
     isActive: this.isActive,
     status: this.status,
     assignedCounsellor: this.assignedCounsellor,
+    groupName: this.groupName,
+    paymentStatus: this.paymentStatus,
     createdBy: this.createdBy,
     createdAt: this.createdAt,
     updatedBy: this.updatedBy,
@@ -260,8 +440,17 @@ studentSchema.methods.toSafeObject = function toSafeObject(includeAccountability
     awaitingSinceMessageId: this.awaitingSinceMessageId,
     lastHandledBy: this.lastHandledBy,
     lastHandledAt: this.lastHandledAt,
+    lastMessageAt: this.lastMessageAt,
     journeyCompleted: this.journeyCompleted,
     responseStatus,
+    // Raw per-stage journey — lets the Students list (StudentCard) derive a
+    // pipeline-milestone outline (Documentation/Offer/Visa) without a
+    // separate request per card. Same data the dedicated
+    // GET /:id/journey endpoint exposes, just piggybacked here too.
+    journey: this.journey,
+    // LOR/SOP intake notes — admin-facing only (this branch), edited on the
+    // Students panel's SIF tab.
+    sif: this.sif,
   };
 };
 

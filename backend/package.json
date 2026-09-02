@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "seed:admin": "node utils/seedAdmin.js",
     "migrate:phase1": "node utils/migratePhase1EmployeeStudent.js",
-    "migrate:phase2-counsellor": "node utils/migratePhase2CounsellorName.js"
+    "migrate:phase2-counsellor": "node utils/migratePhase2CounsellorName.js",
+    "backfill:last-message-at": "node scripts/backfillLastMessageAt.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -1,8 +1,9 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-import type { AuthUser } from '@/lib/auth-api';
+import { AuthSessionInvalidError, fetchMe, type AuthUser } from '@/lib/auth-api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 const TOKEN_KEY = 'wizdom_student_token';
@@ -42,6 +43,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,9 +56,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const [storedToken, storedUser] = await Promise.all([storage.getItem(TOKEN_KEY), storage.getItem(USER_KEY)]);
         if (cancelled) return;
         if (storedToken && storedUser) {
+          let restoredUser = JSON.parse(storedUser) as AuthUser;
+
+          // Re-validate against the server before trusting a restored
+          // session — catches an account that was closed/deactivated while
+          // this app instance was shut down (the real-time socket path in
+          // the effect below only helps while the app was already open).
+          try {
+            const fresh = await fetchMe(storedToken);
+            if (fresh.isActive === false) {
+              await Promise.all([storage.deleteItem(TOKEN_KEY), storage.deleteItem(USER_KEY)]);
+              if (!cancelled) setIsLoading(false);
+              return;
+            }
+            restoredUser = fresh;
+            storage.setItem(USER_KEY, JSON.stringify(fresh)).catch(() => {});
+          } catch (err) {
+            if (err instanceof AuthSessionInvalidError) {
+              await Promise.all([storage.deleteItem(TOKEN_KEY), storage.deleteItem(USER_KEY)]);
+              if (!cancelled) setIsLoading(false);
+              return;
+            }
+            // Couldn't reach the server (offline) — fall back to the
+            // cached session rather than locking the user out.
+          }
+
+          if (cancelled) return;
           connectSocket(storedToken);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser) as AuthUser);
+          setUser(restoredUser);
         }
       } catch {
         // Corrupt/inaccessible storage — treat as logged out rather than
@@ -70,6 +98,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  // Real-time profile sync: when an admin edits this student's record
+  // (name, contact info, payment status, pipeline status, etc.), the
+  // backend emits the fresh safe-user object to this student's own socket
+  // room (see backend/socket.js's emitStudentProfileUpdated, called from
+  // studentsController.updateStudent) — apply it immediately instead of
+  // waiting for the next login/getMe. Reuses the same shared socket
+  // connection chat-context/journey-context attach their own listeners to.
+  useEffect(() => {
+    if (isLoading || !token) return;
+
+    const socket = connectSocket(token);
+
+    const handleProfileUpdated = (incoming: AuthUser) => {
+      // An admin closing this student's account flips isActive false — the
+      // JWT itself stays cryptographically valid for its full expiry, so
+      // without this the app would keep working normally until some request
+      // happened to 401. Force out immediately instead of applying the
+      // update.
+      if (incoming.isActive === false) {
+        disconnectSocket();
+        setUser(null);
+        setToken(null);
+        storage.deleteItem(TOKEN_KEY).catch(() => {});
+        storage.deleteItem(USER_KEY).catch(() => {});
+        Alert.alert('Account closed', 'Your account has been closed. Please contact your counsellor for more information.');
+        router.replace('/login');
+        return;
+      }
+
+      setUser((prev) => {
+        if (prev && incoming.id !== prev.id) return prev;
+        storage.setItem(USER_KEY, JSON.stringify(incoming)).catch(() => {});
+        return incoming;
+      });
+    };
+
+    socket.on('student:profile-updated', handleProfileUpdated);
+    return () => {
+      socket.off('student:profile-updated', handleProfileUpdated);
+    };
+  }, [token, isLoading]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

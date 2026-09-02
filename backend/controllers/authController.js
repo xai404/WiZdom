@@ -44,7 +44,11 @@ exports.login = async (req, res) => {
     }
 
     if (accountType !== 'admin' && account.isActive === false) {
-      return res.status(403).json({ success: false, message: 'This account has been deactivated' });
+      const message =
+        accountType === 'student'
+          ? 'Your account has been closed. Please contact the helpline for assistance.'
+          : 'This account has been closed by the administrator';
+      return res.status(403).json({ success: false, message });
     }
 
     if (isLocked(account)) {

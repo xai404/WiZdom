@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { Send } from 'lucide-react';
+import { Lock, Send } from 'lucide-react';
 import { Button, Card, Select } from '../ui';
 import type { ChatMessage, JourneyStage, JourneyStageStatus } from '../../types';
+
+// "Rejected" is a terminal visa outcome — it's only a valid status on the
+// visa decision stage (adminJourneyController enforces this server-side too).
+const REJECTABLE_STAGE = 'Visa Status Update';
 
 const STATUS_META: Record<JourneyStageStatus, { label: string; dot: string; text: string; bg: string }> = {
   pending: { label: 'Pending', dot: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50' },
   in_progress: { label: 'In Progress', dot: 'bg-yellow-400', text: 'text-yellow-700', bg: 'bg-yellow-50' },
   completed: { label: 'Completed', dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50' },
+  rejected: { label: 'Rejected', dot: 'bg-rose-600', text: 'text-rose-700', bg: 'bg-rose-50' },
 };
 
 const relativeTime = (iso: string | null) => {
@@ -26,10 +31,19 @@ interface JourneyTabProps {
   remarksByStage: Map<string, ChatMessage>;
   onStatusChange: (title: string, status: JourneyStageStatus) => Promise<void>;
   onPostRemark: (title: string, text: string) => Promise<void>;
+  // Closed accounts reject journey writes server-side (adminJourneyController)
+  // too — this just disables the controls so nobody hits save and gets a 403.
+  isClosed: boolean;
 }
 
-const JourneyTab = ({ journey, remarksByStage, onStatusChange, onPostRemark }: JourneyTabProps) => (
+const JourneyTab = ({ journey, remarksByStage, onStatusChange, onPostRemark, isClosed }: JourneyTabProps) => (
   <div className="space-y-3">
+    {isClosed && (
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">
+        <Lock size={14} className="shrink-0 text-slate-400" />
+        This student's account is closed — journey progress can't be changed.
+      </div>
+    )}
     {journey.map((stage, index) => (
       <JourneyRow
         key={stage.title}
@@ -38,6 +52,7 @@ const JourneyTab = ({ journey, remarksByStage, onStatusChange, onPostRemark }: J
         remark={remarksByStage.get(stage.title) ?? null}
         onStatusChange={onStatusChange}
         onPostRemark={onPostRemark}
+        isClosed={isClosed}
       />
     ))}
   </div>
@@ -49,12 +64,14 @@ const JourneyRow = ({
   remark,
   onStatusChange,
   onPostRemark,
+  isClosed,
 }: {
   stage: JourneyStage;
   index: number;
   remark: ChatMessage | null;
   onStatusChange: (title: string, status: JourneyStageStatus) => Promise<void>;
   onPostRemark: (title: string, text: string) => Promise<void>;
+  isClosed: boolean;
 }) => {
   const [saving, setSaving] = useState(false);
   const [comment, setComment] = useState('');
@@ -101,15 +118,17 @@ const JourneyRow = ({
         <div className="self-start sm:self-auto">
           <Select
             value={stage.status}
-            disabled={saving}
+            disabled={saving || isClosed}
             onChange={(e) => handleStatus(e.target.value as JourneyStageStatus)}
             className={`min-w-40 font-medium ${meta.text}`}
           >
-            {(Object.keys(STATUS_META) as JourneyStageStatus[]).map((status) => (
-              <option key={status} value={status}>
-                {STATUS_META[status].label}
-              </option>
-            ))}
+            {(Object.keys(STATUS_META) as JourneyStageStatus[])
+              .filter((status) => status !== 'rejected' || stage.title === REJECTABLE_STAGE)
+              .map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_META[status].label}
+                </option>
+              ))}
           </Select>
         </div>
       </div>
@@ -118,18 +137,20 @@ const JourneyRow = ({
         {remark ? <p className="text-sm text-slate-600">{remark.deleted ? 'This message was deleted' : remark.text}</p> : null}
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Write a remark for this stage…"
-          className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-        />
-        <Button size="sm" variant="secondary" onClick={handleSend} disabled={!comment.trim() || sending} loading={sending} icon={<Send size={14} />}>
-          Save
-        </Button>
-      </div>
+      {!isClosed && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Write a remark for this stage…"
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          />
+          <Button size="sm" variant="secondary" onClick={handleSend} disabled={!comment.trim() || sending} loading={sending} icon={<Send size={14} />}>
+            Save
+          </Button>
+        </div>
+      )}
     </Card>
   );
 };

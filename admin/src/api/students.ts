@@ -1,6 +1,80 @@
 import api from './client';
-import type { ChatMessage, JourneyStage, JourneyStageStatus, Student, StudentStatus } from '../types';
+import {
+  ACADEMIC_LEVELS,
+  buildDefaultAcademicQualifications,
+  DOCUMENT_CHECKLIST_TEMPLATE,
+  EMPTY_ACADEMIC_QUALIFICATION,
+  EMPTY_INTEREST_FORM,
+  EMPTY_INTERNSHIP_ROW,
+  EMPTY_PERSONAL_DETAILS,
+  EMPTY_SOP,
+  type AcademicQualification,
+  type ChatMessage,
+  type DocumentChecklistItem,
+  type JourneyStage,
+  type JourneyStageStatus,
+  type Sif,
+  type Student,
+  type StudentStatus,
+} from '../types';
 import type { PaginationMeta } from '../components/ui';
+
+const normalizeAcademics = (raw: any): AcademicQualification[] => {
+  const rows: AcademicQualification[] = Array.isArray(raw)
+    ? raw.map((r: any) => ({ ...EMPTY_ACADEMIC_QUALIFICATION, ...(r ?? {}) }))
+    : [];
+  if (!rows.length) return buildDefaultAcademicQualifications();
+  const byLevel = new Map(rows.map((r) => [r.level, r]));
+  const ordered = ACADEMIC_LEVELS.map(
+    (level) => byLevel.get(level) ?? { ...EMPTY_ACADEMIC_QUALIFICATION, level },
+  );
+  const extras = rows.filter((r) => !ACADEMIC_LEVELS.includes(r.level));
+  return [...ordered, ...extras];
+};
+
+const normalizeDocuments = (raw: any): DocumentChecklistItem[] => {
+  const saved = new Map<string, any>(
+    Array.isArray(raw) ? raw.filter((r) => r?.key).map((r) => [r.key, r]) : [],
+  );
+  return DOCUMENT_CHECKLIST_TEMPLATE.map(({ key, name, format }) => {
+    const r = saved.get(key);
+    const ready = r?.ready === 'yes' || r?.ready === 'no' ? r.ready : '';
+    return { key, name, format, ready };
+  });
+};
+
+const normalizeSif = (s: any): Sif => ({
+  lor: Array.isArray(s?.lor)
+    ? s.lor.map((r: any) => ({
+        professorName: r?.professorName ?? '',
+        contactPhone: r?.contactPhone ?? '',
+        contactEmail: r?.contactEmail ?? '',
+        degreeStudied: r?.degreeStudied ?? '',
+        cgpa: r?.cgpa ?? '',
+        subjectsTopics: r?.subjectsTopics ?? '',
+        projects: r?.projects ?? '',
+        internshipsActivities: r?.internshipsActivities ?? '',
+      }))
+    : [],
+  interestForm: {
+    ...EMPTY_INTEREST_FORM,
+    ...(s?.interestForm ?? {}),
+    preferredCountries: Array.isArray(s?.interestForm?.preferredCountries) ? s.interestForm.preferredCountries : [],
+    preferredStreams: Array.isArray(s?.interestForm?.preferredStreams) ? s.interestForm.preferredStreams : [],
+    entranceTestSupport: Array.isArray(s?.interestForm?.entranceTestSupport) ? s.interestForm.entranceTestSupport : [],
+    admissionSupport: Array.isArray(s?.interestForm?.admissionSupport) ? s.interestForm.admissionSupport : [],
+    agreedToTerms: s?.interestForm?.agreedToTerms === true,
+  },
+  personalDetails: { ...EMPTY_PERSONAL_DETAILS, ...(s?.personalDetails ?? {}) },
+  academicQualifications: normalizeAcademics(s?.academicQualifications),
+  internshipExperience: Array.isArray(s?.internshipExperience)
+    ? s.internshipExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
+    : [],
+  documentChecklist: normalizeDocuments(s?.documentChecklist),
+  sop: { ...EMPTY_SOP, ...(s?.sop ?? {}) },
+  updatedAt: s?.updatedAt ?? null,
+  updatedByName: s?.updatedByName ?? null,
+});
 
 const normalize = (s: any): Student => ({
   id: s.id ?? s._id,
@@ -14,6 +88,8 @@ const normalize = (s: any): Student => ({
   isActive: s.isActive,
   status: s.status,
   assignedCounsellor: s.assignedCounsellor ?? '',
+  groupName: s.groupName ?? '',
+  paymentStatus: s.paymentStatus ?? null,
   createdBy: s.createdBy,
   updatedBy: s.updatedBy,
   updatedAt: s.updatedAt,
@@ -27,7 +103,17 @@ const normalize = (s: any): Student => ({
   lastHandledAt: s.lastHandledAt ?? null,
   journeyCompleted: s.journeyCompleted ?? false,
   responseStatus: s.responseStatus ?? 'in_progress',
+  journey: s.journey ?? [],
+  sif: normalizeSif(s.sif),
 });
+
+export type StudentMilestoneFilter =
+  | 'documentation_completed'
+  | 'offer_received'
+  | 'visa_approved'
+  | 'visa_rejected'
+  | 'inactive'
+  | 'closed';
 
 export interface FetchStudentsParams {
   search?: string;
@@ -35,6 +121,7 @@ export interface FetchStudentsParams {
   intakeYear?: number | '';
   intakeMonth?: number | '';
   assignedCounsellor?: string;
+  milestone?: StudentMilestoneFilter | '';
   page?: number;
   limit?: number;
 }
@@ -102,6 +189,15 @@ export const postStudentChatMessage = async (
 export const deleteStudentChatMessage = async (id: string, messageId: string): Promise<ChatMessage> => {
   const res = await api.delete(`/students/${id}/chat/${messageId}`);
   return res.data.message;
+};
+
+export const editStudentChatMessage = async (id: string, messageId: string, text: string): Promise<ChatMessage> => {
+  const res = await api.patch(`/students/${id}/chat/${messageId}`, { text });
+  return res.data.message;
+};
+
+export const clearStudentChat = async (id: string): Promise<void> => {
+  await api.delete(`/students/${id}/chat`);
 };
 
 export const toggleMessagePin = async (id: string, messageId: string): Promise<ChatMessage> => {

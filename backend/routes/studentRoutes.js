@@ -1,7 +1,13 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { getMyJourney } = require('../controllers/studentJourneyController');
-const { getMyChat, postChatReply, markChatRead } = require('../controllers/studentChatController');
+const {
+  getMyChat,
+  postChatReply,
+  markChatRead,
+  deleteMyMessage,
+  editMyMessage,
+} = require('../controllers/studentChatController');
 const { getActiveDepartments } = require('../controllers/employeesController');
 const {
   getMyNotifications,
@@ -10,6 +16,7 @@ const {
 } = require('../controllers/studentNotificationController');
 const { registerPushToken } = require('../controllers/studentPushController');
 const { resetMyPassword } = require('../controllers/studentAccountController');
+const { getMySif, updateMySif } = require('../controllers/studentSifController');
 const { getHelplineContact, getSupportContacts } = require('../controllers/supportContactsController');
 const { protect, requireRole } = require('../middleware/authMiddleware');
 
@@ -29,6 +36,8 @@ router.get('/journey', protect, requireRole('student'), getMyJourney);
 router.get('/chat', protect, requireRole('student'), getMyChat);
 router.post('/chat/reply', protect, requireRole('student'), postChatReply);
 router.post('/chat/read', protect, requireRole('student'), markChatRead);
+router.patch('/chat/:messageId', protect, requireRole('student'), editMyMessage);
+router.delete('/chat/:messageId', protect, requireRole('student'), deleteMyMessage);
 
 // Departments the "tag a team" picker should offer — only ones with an
 // active employee to actually pick the tag up. See
@@ -42,6 +51,10 @@ router.post('/notifications/read-all', protect, requireRole('student'), markAllN
 router.post('/push-token', protect, requireRole('student'), registerPushToken);
 
 router.post('/reset-password', protect, requireRole('student'), resetMyPassword);
+
+// Student Information Form — the student's own LOR/SOP intake notes.
+router.get('/sif', protect, requireRole('student'), getMySif);
+router.put('/sif', protect, requireRole('student'), updateMySif);
 
 // No auth — used pre-login, before there's a token to gate with.
 router.get('/helpline', helplineLimiter, getHelplineContact);

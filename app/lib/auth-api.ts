@@ -23,6 +23,7 @@ export type AuthUser = {
   profilePicture?: string | null;
   assignedCounsellor?: string;
   status?: string;
+  paymentStatus?: 'Paid in Full' | 'Half Payment' | 'Free' | null;
   createdBy?: ProfileAuditor | null;
 };
 
@@ -31,6 +32,51 @@ export type LoginResponse = {
   token: string;
   user: AuthUser;
 };
+
+// Thrown by fetchMe specifically when the SERVER rejected the session
+// (expired/invalid token, or the account no longer exists) — distinct from
+// a network/offline failure, so callers can tell "this session is actually
+// dead, log out" apart from "couldn't reach the server, keep using the
+// cached session".
+export class AuthSessionInvalidError extends Error {}
+
+// Re-validates a persisted token against the server on app launch — a
+// restored session from SecureStore/localStorage otherwise trusts
+// whatever was cached with zero server round-trip, so an account closed
+// while the app was shut also stays "logged in" until some other request
+// happens to 401. isActive on the returned user reflects the CURRENT
+// server state (unlike the cached copy), so the caller can force a logout
+// on a closed account even though the JWT itself is still valid.
+export async function fetchMe(token: string, timeoutMs = 8000): Promise<AuthUser> {
+  let response: Response;
+  // Bound the wait: on app launch the caller blocks the loading screen on
+  // this call, and a bare fetch on a captive-portal / half-open connection
+  // hangs for the OS default (30-60s+). An abort surfaces as a network
+  // failure so the caller falls back to the cached session.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check your connection and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
+    throw new AuthSessionInvalidError('Session no longer valid');
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || 'Could not verify session.');
+  }
+
+  return data.user as AuthUser;
+}
 
 export async function loginRequest(email: string, password: string): Promise<LoginResponse> {
   let response: Response;

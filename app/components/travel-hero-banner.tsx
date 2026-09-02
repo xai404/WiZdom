@@ -109,12 +109,23 @@ export function TravelHeroBanner({ quote }: TravelHeroBannerProps) {
   const balloonTranslateY = balloonBob.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
 
   return (
-    <Animated.View style={{ opacity: fade, marginHorizontal: 20, marginTop: 12, borderRadius: 28, overflow: 'hidden' }}>
+    <Animated.View
+      style={{
+        opacity: fade,
+        marginHorizontal: 20,
+        marginTop: 12,
+        borderRadius: 28,
+        shadowColor: '#001B47',
+        shadowOpacity: 0.22,
+        shadowRadius: 22,
+        shadowOffset: { width: 0, height: 12 },
+        elevation: 8,
+      }}>
       <LinearGradient
         colors={['#00132e', '#0049B7', '#3B82F6']}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.95, y: 1 }}
-        style={{ height: quote ? 96 : 168, paddingHorizontal: 20, paddingTop: 18 }}>
+        style={{ height: quote ? 96 : 168, paddingHorizontal: 20, paddingTop: 18, borderRadius: 28, overflow: 'hidden' }}>
         {STARS.map((star, i) => (
           <Star key={i} {...star} />
         ))}

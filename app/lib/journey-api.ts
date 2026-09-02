@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/constants/config';
 
-export type JourneyStageStatus = 'pending' | 'in_progress' | 'completed';
+export type JourneyStageStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
 
 export type JourneyStage = {
   title: string;

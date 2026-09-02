@@ -88,6 +88,14 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Set once a staff member edits their own message's text within the
+    // 10-minute edit window (see adminChatController.editAdminMessage) —
+    // surfaced as an "edited" label next to the timestamp so the change
+    // isn't silent.
+    edited: {
+      type: Boolean,
+      default: false,
+    },
     // Structural reply — the quoted message. Resolved client-side against
     // the already-loaded thread rather than populated here, so a later
     // soft-delete of the quoted message is reflected live.

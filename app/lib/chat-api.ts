@@ -12,6 +12,11 @@ export type ChatMessage = {
   senderRole: string | null;
   text: string;
   stage: string | null;
+  // Only present on the student's own sent messages (the team they chose to
+  // tag) — stripped server-side from admin-authored messages, which route
+  // internally without exposing that detail to the student. See
+  // studentChatController.getMyChat.
+  department: string | null;
   readByStudent: boolean;
   // Whether staff have read this message — only meaningful for messages the
   // student themselves sent.
@@ -29,6 +34,11 @@ export type ChatMessage = {
   // for the audit trail server-side) but must never be rendered; show a
   // tombstone instead, same as the Admin Panel does.
   deleted: boolean;
+  // Set once the sender edited this message's text within the 10-minute
+  // edit window (studentChatController.editMyMessage /
+  // adminChatController.editAdminMessage) — surfaced as an "edited" label
+  // next to the timestamp so the change isn't silent.
+  edited: boolean;
   // Structural reply target's message id, resolved client-side against the
   // already-loaded thread (mirrors the Admin Panel's approach) so a later
   // delete of the quoted message is reflected live.
@@ -58,14 +68,19 @@ export async function fetchMyChat(token: string): Promise<ChatMessage[]> {
 
 export async function postChatReply(
   token: string,
-  payload: { text: string; stage?: string | null; replyTo?: string | null }
+  payload: { text: string; stage?: string | null; replyTo?: string | null; department?: string | null }
 ): Promise<ChatMessage> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/student/chat/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ text: payload.text, stage: payload.stage ?? null, replyTo: payload.replyTo ?? null }),
+      body: JSON.stringify({
+        text: payload.text,
+        stage: payload.stage ?? null,
+        replyTo: payload.replyTo ?? null,
+        department: payload.department ?? null,
+      }),
     });
   } catch {
     throw new Error('Unable to reach the server. Check your connection and try again.');
@@ -75,6 +90,47 @@ export async function postChatReply(
 
   if (!response.ok || !data?.success) {
     throw new Error(data?.message || 'Unable to send your message right now.');
+  }
+
+  return data.message as ChatMessage;
+}
+
+export async function deleteMyMessage(token: string, messageId: string): Promise<ChatMessage> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/student/chat/${messageId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check your connection and try again.');
+  }
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || 'Unable to delete this message right now.');
+  }
+
+  return data.message as ChatMessage;
+}
+
+export async function editMyMessage(token: string, messageId: string, text: string): Promise<ChatMessage> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/student/chat/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text }),
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check your connection and try again.');
+  }
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || 'Unable to edit this message right now.');
   }
 
   return data.message as ChatMessage;

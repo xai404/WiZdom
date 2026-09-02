@@ -2,7 +2,14 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { useAuth } from '@/context/auth-context';
-import { fetchMyChat, markChatRead, postChatReply, type ChatMessage } from '@/lib/chat-api';
+import {
+  deleteMyMessage,
+  editMyMessage,
+  fetchMyChat,
+  markChatRead,
+  postChatReply,
+  type ChatMessage,
+} from '@/lib/chat-api';
 import { connectSocket, getSocket } from '@/lib/socket';
 
 type ChatContextValue = {
@@ -11,7 +18,9 @@ type ChatContextValue = {
   error: string | null;
   reload: () => void;
   unreadCount: number;
-  sendReply: (text: string, stage?: string | null, replyTo?: string | null) => Promise<void>;
+  sendReply: (text: string, stage?: string | null, replyTo?: string | null, department?: string | null) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  editMessage: (messageId: string, text: string) => Promise<void>;
   markRead: () => void;
 };
 
@@ -31,9 +40,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Clear any previous student's data on logout — otherwise it lingers
       // in memory and can flash briefly when a different student logs in
       // on the same device before their own fetch resolves.
+      // No "session expired" banner here — logout (including the forced
+      // one when an account is closed, see auth-context.tsx) already
+      // navigates straight to /login, so this screen won't stay mounted
+      // long enough for a message to matter; showing one anyway would
+      // needlessly flash on top of that redirect.
       setMessages(null);
       setLoading(false);
-      setError('Your session has expired. Please log in again.');
+      setError(null);
       return;
     }
     setLoading(true);
@@ -105,9 +119,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       applyIncomingMessage(incoming);
     };
 
+    // An existing message changed in place — an edit (new text + `edited`),
+    // a soft-delete, or a pin toggle. Replace it by _id; never append.
+    const handleUpdatedMessage = (incoming: ChatMessage & { studentId: string }) => {
+      if (user && incoming.studentId !== user.id) return;
+      setMessages((prev) => prev?.map((m) => (m._id === incoming._id ? { ...m, ...incoming } : m)) ?? prev);
+    };
+
+    // An admin hard-cleared the whole thread.
+    const handleThreadCleared = (payload: { studentId: string }) => {
+      if (user && payload.studentId !== user.id) return;
+      setMessages([]);
+    };
+
     socket.on('chat:new-message', handleNewMessage);
+    socket.on('chat:message-updated', handleUpdatedMessage);
+    socket.on('chat:thread-cleared', handleThreadCleared);
     return () => {
       socket.off('chat:new-message', handleNewMessage);
+      socket.off('chat:message-updated', handleUpdatedMessage);
+      socket.off('chat:thread-cleared', handleThreadCleared);
     };
   }, [token, authLoading, user, applyIncomingMessage]);
 
@@ -150,7 +181,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   const sendReply = useCallback(
-    async (text: string, stage?: string | null, replyTo?: string | null) => {
+    async (text: string, stage?: string | null, replyTo?: string | null, department?: string | null) => {
       const trimmed = text.trim();
       if (!trimmed || !token) return;
 
@@ -161,23 +192,75 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         senderRole: null,
         text: trimmed,
         stage: stage ?? null,
+        department: department ?? null,
         readByStudent: true,
         readByAdmin: false,
         fullyRead: false,
         pinned: false,
         deleted: false,
+        edited: false,
         replyTo: replyTo ?? null,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...(prev ?? []), optimistic]);
 
       try {
-        const saved = await postChatReply(token, { text: trimmed, stage, replyTo });
+        const saved = await postChatReply(token, { text: trimmed, stage, replyTo, department });
         setMessages((prev) => (prev ?? []).map((message) => (message._id === optimistic._id ? saved : message)));
       } catch {
         // Keep the optimistic message visible rather than yanking it away —
         // the student already saw it "sent"; a silent background retry
         // isn't worth the complexity for this feature.
+      }
+    },
+    [token]
+  );
+
+  // Optimistic like sendReply: flip the tombstone immediately so the bubble
+  // updates without waiting on the round trip, then reconcile with the
+  // server copy once it resolves. On failure, revert — unlike a failed
+  // send there's nothing worth leaving half-applied for a delete.
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!token) return;
+
+      setMessages((prev) => prev?.map((message) => (message._id === messageId ? { ...message, deleted: true } : message)) ?? prev);
+
+      try {
+        const updated = await deleteMyMessage(token, messageId);
+        setMessages((prev) => prev?.map((message) => (message._id === messageId ? updated : message)) ?? prev);
+      } catch {
+        setMessages((prev) => prev?.map((message) => (message._id === messageId ? { ...message, deleted: false } : message)) ?? prev);
+      }
+    },
+    [token]
+  );
+
+  // Optimistic like deleteMessage: apply the new text (and the "edited"
+  // flag) immediately, then reconcile with the server copy. Revert on
+  // failure — there's nothing worth leaving half-applied.
+  const editMessage = useCallback(
+    async (messageId: string, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || !token) return;
+
+      let previous: ChatMessage | undefined;
+      setMessages(
+        (prev) =>
+          prev?.map((message) => {
+            if (message._id !== messageId) return message;
+            previous = message;
+            return { ...message, text: trimmed, edited: true };
+          }) ?? prev
+      );
+
+      try {
+        const updated = await editMyMessage(token, messageId, trimmed);
+        setMessages((prev) => prev?.map((message) => (message._id === messageId ? updated : message)) ?? prev);
+      } catch {
+        setMessages(
+          (prev) => prev?.map((message) => (message._id === messageId && previous ? previous : message)) ?? prev
+        );
       }
     },
     [token]
@@ -190,8 +273,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const value = useMemo(
-    () => ({ messages, loading, error, reload, unreadCount, sendReply, markRead }),
-    [messages, loading, error, reload, unreadCount, sendReply, markRead]
+    () => ({ messages, loading, error, reload, unreadCount, sendReply, deleteMessage, editMessage, markRead }),
+    [messages, loading, error, reload, unreadCount, sendReply, deleteMessage, editMessage, markRead]
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

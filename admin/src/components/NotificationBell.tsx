@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, CheckCheck, Users } from 'lucide-react';
 import { fetchMyNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notifications';
 import { useInterval } from '../hooks/useInterval';
+import { useAuth } from '../context/AuthContext';
+import { getSocket } from '../lib/socket';
 import { relativeTime } from './students/JourneyTab';
 import type { AppNotification } from '../types';
 
@@ -17,6 +19,7 @@ interface NotificationBellProps {
 
 const NotificationBell = ({ variant = 'light' }: NotificationBellProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -30,9 +33,47 @@ const NotificationBell = ({ variant = 'light' }: NotificationBellProps) => {
       .catch(() => {});
   };
 
+  // useInterval only sets up the *recurring* timer — without this, the
+  // badge sits at its initial 0 for the first POLL_MS after every mount
+  // (every page load/refresh), even though the backend already has an
+  // accurate unread count available immediately.
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useInterval(() => {
     if (!document.hidden) load();
   }, POLL_MS);
+
+  // Real-time nudge — the backend emits 'notification:new' to the shared
+  // staff room whenever a staff-facing Notification is created (a student
+  // message, a department tag). The 15s poll above stays as the
+  // fallback/reconciliation path. The socket is opened by AuthContext once
+  // the session is known, which may land after `user` first becomes
+  // truthy, so poll getSocket() until it's available (same pattern as
+  // StudentsWorkspace) rather than bailing forever on a one-shot check.
+  useEffect(() => {
+    if (!user) return;
+    const onNew = () => load();
+
+    let bound: ReturnType<typeof getSocket> = null;
+    const bind = () => {
+      const socket = getSocket();
+      if (!socket || socket === bound) return;
+      bound?.off('notification:new', onNew);
+      socket.on('notification:new', onNew);
+      bound = socket;
+    };
+    bind();
+    const poll = setInterval(bind, 1000);
+
+    return () => {
+      clearInterval(poll);
+      bound?.off('notification:new', onNew);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleOpen = () => {
     setOpen((v) => !v);
@@ -99,7 +140,7 @@ const NotificationBell = ({ variant = 'light' }: NotificationBellProps) => {
                 {notifications.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
                     <Bell size={22} />
-                    <p className="text-sm">Nothing tagged to your team yet.</p>
+                    <p className="text-sm">No notifications yet.</p>
                   </div>
                 ) : (
                   notifications.map((n) => (

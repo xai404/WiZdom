@@ -1,42 +1,17 @@
 import type { Student } from '../types';
 
-// Mirrors the exact country list in StudentForm.tsx's `COUNTRIES` array —
-// keep both in sync if that list ever changes.
-export const COUNTRY_FLAGS: Record<string, string> = {
-  USA: '🇺🇸',
-  UK: '🇬🇧',
-  Canada: '🇨🇦',
-  Australia: '🇦🇺',
-  Germany: '🇩🇪',
-  Ireland: '🇮🇪',
-  'New Zealand': '🇳🇿',
-  'Czech Republic': '🇨🇿',
-  'Dubai (UAE)': '🇦🇪',
-  Finland: '🇫🇮',
-  Cyprus: '🇨🇾',
-  Denmark: '🇩🇰',
-  France: '🇫🇷',
-  Italy: '🇮🇹',
-};
-
 const MONTH_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-export function formatIntakeLine(
-  student: Pick<Student, 'countryInterested' | 'intakeMonth' | 'intakeYear'>
-): string {
-  const country = student.countryInterested?.[0];
-  const monthLabel =
-    student.intakeMonth && student.intakeMonth >= 1 && student.intakeMonth <= 12
-      ? MONTH_SHORT[student.intakeMonth - 1]
-      : null;
-  const intakeLabel = monthLabel && student.intakeYear ? `${monthLabel} ${student.intakeYear} Intake` : null;
-
-  if (!country && !intakeLabel) return 'Country & intake not set';
-
-  const flag = country ? COUNTRY_FLAGS[country] : null;
-  const countryPart = country ? `${flag ? `${flag} ` : ''}${country}` : null;
-
-  return [countryPart, intakeLabel].filter(Boolean).join(' • ');
+// Compact two-line form ("AUG" / "26") for the small circle StudentCard
+// shows in place of a letter avatar — null when intake isn't set, so the
+// card can fall back to a neutral placeholder instead of a blank badge.
+export function formatIntakeBadge(
+  student: Pick<Student, 'intakeMonth' | 'intakeYear'>
+): { month: string; year: string } | null {
+  if (!student.intakeMonth || student.intakeMonth < 1 || student.intakeMonth > 12 || !student.intakeYear) {
+    return null;
+  }
+  return { month: MONTH_SHORT[student.intakeMonth - 1].toUpperCase(), year: String(student.intakeYear).slice(-2) };
 }

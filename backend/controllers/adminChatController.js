@@ -8,7 +8,17 @@ const { createNotification } = require('../utils/notify');
 const { sendPushToStudent } = require('../utils/pushService');
 const { resolveAccount } = require('../utils/resolveAccount');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
-const { emitChatMessage } = require('../socket');
+const { isDepartmentStaffed } = require('../utils/departments');
+const { emitChatMessage, emitChatMessageUpdated, emitChatThreadCleared } = require('../socket');
+
+// Broadcasts an in-place change to an existing message (edit / soft-delete /
+// pin) to the student's room and every staff view, with read-status
+// attached so the tick colour doesn't flicker until the next poll.
+const broadcastMessageUpdate = async (message, studentId) => {
+  const participantIds = await getActiveParticipantIds(studentId);
+  const [withStatus] = attachReadStatus([message], participantIds, studentId);
+  emitChatMessageUpdated(withStatus, studentId);
+};
 
 // @desc    Get a student's Group Chat thread (admin-side view of the same
 //          single shared conversation the Student App reads/writes).
@@ -22,7 +32,9 @@ const { emitChatMessage } = require('../socket');
 // @route   GET /api/students/:id/chat
 // @access  Private/Staff (super_admin + every employee role)
 const getStudentChat = asyncHandler(async (req, res) => {
-  const student = await Student.findById(req.params.id).select('_id');
+  const student = await Student.findById(req.params.id).select(
+    '_id awaitingReply responsibleDepartment awaitingSinceMessageId'
+  );
   if (!student) throw new ApiError(404, 'Student not found');
 
   // Mark read BEFORE fetching — so this viewer's own readBy entry is
@@ -40,6 +52,18 @@ const getStudentChat = asyncHandler(async (req, res) => {
 
   const participantIds = await getActiveParticipantIds(student._id);
   const withStatus = attachReadStatus(messages, participantIds, student._id);
+
+  // "Awaiting reply" for an UNTAGGED thread (nobody on the hook) clears as
+  // soon as the first staff member opens it — this GET is that signal. A
+  // thread a department owns is untouched here: it stays awaiting until
+  // that department actually replies (postAdminMessage). The guard keeps
+  // this from writing on every poll — once cleared, awaitingReply is false.
+  if (student.awaitingReply && !student.responsibleDepartment) {
+    await Student.updateOne(
+      { _id: student._id },
+      { $set: { awaitingReply: false, awaitingSince: null, awaitingSinceMessageId: null } }
+    );
+  }
 
   res.status(200).json({ success: true, messages: withStatus });
 });
@@ -78,9 +102,18 @@ const postAdminMessage = asyncHandler(async (req, res) => {
   if (department && !Employee.DEPARTMENTS.includes(department)) {
     throw new ApiError(400, 'Invalid department');
   }
+  // An unstaffed department can never reply, so tagging it would strand the
+  // thread in "awaiting reply" forever — refuse it here rather than relying
+  // on the client to have hidden it from the picker.
+  if (department && !(await isDepartmentStaffed(department))) {
+    throw new ApiError(400, `The ${department} team has no active members to handle this`);
+  }
 
-  const student = await Student.findById(req.params.id).select('name responsibleDepartment awaitingReply pushTokens');
+  const student = await Student.findById(req.params.id).select('name status responsibleDepartment awaitingReply pushTokens');
   if (!student) throw new ApiError(404, 'Student not found');
+  if (student.status === 'Closed') {
+    throw new ApiError(403, "This student's account is closed — reopen it before messaging them");
+  }
 
   if (replyTo) {
     const target = await Message.findOne({ _id: replyTo, student: student._id }).select('_id');
@@ -106,7 +139,10 @@ const postAdminMessage = asyncHandler(async (req, res) => {
     readBy: [sender.id],
   });
 
-  const studentUpdate = {};
+  // lastMessageAt bumps on every send so the Students list re-sorts this
+  // thread to the top. The branches below decide whether the thread is
+  // awaiting a reply at all, and only they touch awaitingSinceMessageId.
+  const studentUpdate = { lastMessageAt: new Date() };
   let departmentTagged = false;
 
   // A stage-tagged message is a remark, i.e. it counts as updating the
@@ -117,21 +153,39 @@ const postAdminMessage = asyncHandler(async (req, res) => {
   }
 
   if (department) {
+    // Explicit (re)tag — that department is now on the hook.
     studentUpdate.responsibleDepartment = department;
     studentUpdate.awaitingReply = true;
     studentUpdate.awaitingSince = new Date();
     studentUpdate.awaitingSinceMessageId = message._id;
     departmentTagged = true;
   } else if (senderDepartment && student.responsibleDepartment === senderDepartment && student.awaitingReply) {
+    // The responsible department has replied — the wait is over.
     studentUpdate.awaitingReply = false;
+    studentUpdate.awaitingSince = null;
     studentUpdate.awaitingSinceMessageId = null;
     studentUpdate.lastHandledBy = { id: sender.id, name: sender.name, department: senderDepartment };
     studentUpdate.lastHandledAt = new Date();
+  } else if (student.awaitingReply && !student.responsibleDepartment) {
+    // Untagged thread nobody formally owes a reply on — any staff reply
+    // ends the wait (same rule as "first staff member to open it" in
+    // getStudentChat).
+    studentUpdate.awaitingReply = false;
+    studentUpdate.awaitingSince = null;
+    studentUpdate.awaitingSinceMessageId = null;
+  } else if (student.awaitingReply) {
+    // The thread was ALREADY awaiting a reply and a department still owes
+    // it — this message isn't from that department, so leave the wait in
+    // place; awaitingSinceMessageId keeps pointing at whichever message
+    // opened it.
+    studentUpdate.awaitingReply = true;
   }
+  // else: an untagged, staff-initiated message into a thread nobody owes a
+  // reply on — it's just chat, per the state machine above, so the
+  // accountability state is left completely untouched (staff must never put
+  // their own thread into "awaiting response").
 
-  if (Object.keys(studentUpdate).length) {
-    await Student.updateOne({ _id: student._id }, { $set: studentUpdate });
-  }
+  await Student.updateOne({ _id: student._id }, { $set: studentUpdate });
 
   // Chat messages get a phone push (so the student is alerted even when
   // the app isn't open) but deliberately do NOT create a Notification
@@ -180,7 +234,78 @@ const deleteAdminMessage = asyncHandler(async (req, res) => {
   if (!message.deleted) {
     message.deleted = true;
     await message.save();
+    await broadcastMessageUpdate(message, req.params.id);
   }
+
+  res.status(200).json({ success: true, message });
+});
+
+// @desc    Permanently clear a student's ENTIRE Group Chat thread — every
+//          message, including stage-tagged ones. Unlike single-message
+//          delete (a soft, audit-trailed tombstone any staff member can
+//          apply to any message), this is a real hard delete with no undo,
+//          which is why it's restricted to admin/super_admin. It also wipes
+//          journey remarks for any stage whose only remark was a chat
+//          message — see the Message schema's `stage` field and
+//          studentJourneyController.getMyJourney, which derives each
+//          stage's remark from this same collection rather than storing it
+//          separately.
+// @route   DELETE /api/students/:id/chat
+// @access  Private/Admin (super_admin + admin only)
+const clearStudentChat = asyncHandler(async (req, res) => {
+  const student = await Student.findById(req.params.id).select('_id');
+  if (!student) throw new ApiError(404, 'Student not found');
+
+  await Message.deleteMany({ student: student._id });
+
+  // No messages left, so nothing can be "awaiting" a reply or a read —
+  // reset the accountability flags rather than leaving a stale badge on a
+  // now-empty thread.
+  await Student.updateOne(
+    { _id: student._id },
+    { $set: { awaitingReply: false, awaitingSince: null, awaitingSinceMessageId: null } }
+  );
+
+  emitChatThreadCleared(student._id);
+
+  res.status(200).json({ success: true });
+});
+
+// A message can only be edited within this window of when it was sent —
+// same WhatsApp-style "edit, but only briefly" semantics as most chat apps,
+// so a stale message can't be silently rewritten long after the fact.
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
+
+// @desc    Edit the text of one of the CURRENT staff member's own messages,
+//          within 10 minutes of sending it. Unlike delete (any staff member
+//          may delete any admin message) this is restricted to the
+//          message's own sender — editing someone else's words isn't the
+//          same kind of action as retracting your own.
+// @route   PATCH /api/students/:id/chat/:messageId
+// @access  Private/Staff (message's own sender only)
+const editAdminMessage = asyncHandler(async (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    throw new ApiError(400, 'Message text is required');
+  }
+
+  const message = await Message.findOne({ _id: req.params.messageId, student: req.params.id });
+  if (!message) throw new ApiError(404, 'Message not found');
+
+  if (message.sender !== 'admin' || String(message.senderId) !== String(req.user.id)) {
+    throw new ApiError(403, 'You can only edit your own messages');
+  }
+  if (message.deleted) {
+    throw new ApiError(400, 'Cannot edit a deleted message');
+  }
+  if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
+    throw new ApiError(400, 'The 10-minute edit window for this message has expired');
+  }
+
+  message.text = text.trim();
+  message.edited = true;
+  await message.save();
+  await broadcastMessageUpdate(message, req.params.id);
 
   res.status(200).json({ success: true, message });
 });
@@ -197,8 +322,16 @@ const togglePinMessage = asyncHandler(async (req, res) => {
 
   message.pinned = !message.pinned;
   await message.save();
+  await broadcastMessageUpdate(message, req.params.id);
 
   res.status(200).json({ success: true, message });
 });
 
-module.exports = { getStudentChat, postAdminMessage, deleteAdminMessage, togglePinMessage };
+module.exports = {
+  getStudentChat,
+  postAdminMessage,
+  deleteAdminMessage,
+  editAdminMessage,
+  clearStudentChat,
+  togglePinMessage,
+};

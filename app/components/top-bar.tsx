@@ -36,15 +36,15 @@ export function TopBar({ title }: { title?: string }) {
       end={{ x: 1, y: 1 }}
       style={{
         paddingTop: 14,
-        paddingBottom: 16,
+        paddingBottom: 18,
         paddingHorizontal: 12,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        shadowColor: '#0049B7',
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 8,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        shadowColor: '#001B47',
+        shadowOpacity: 0.26,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 12 },
+        elevation: 10,
       }}>
       <View className="flex-row items-center justify-between">
         {router.canGoBack() ? (

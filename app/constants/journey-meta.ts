@@ -99,4 +99,18 @@ export const STATUS_META: Record<
     icon: 'ellipse-outline',
     pulse: false,
   },
+  // Terminal negative outcome (set by admin/employee on a stage — in
+  // practice only "Visa Status Update"). Rendered like Pending in the
+  // timeline nodes/connectors; the rose badge + label carry the meaning.
+  rejected: {
+    label: 'Rejected',
+    color: '#e11d48',
+    bg: '#ffe4e6',
+    tint: '#fff1f2',
+    tintDark: '#2a1015',
+    badgeBg: '#ffe4e6',
+    badgeText: '#be123c',
+    icon: 'close-circle',
+    pulse: false,
+  },
 };

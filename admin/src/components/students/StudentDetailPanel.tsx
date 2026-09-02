@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Milestone, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Milestone, MessageCircle, ClipboardList } from 'lucide-react';
 import { Tabs } from '../ui';
 import type { TabItem } from '../ui';
 import { fetchStudentById, fetchStudentChat, fetchStudentJourney, postStudentChatMessage, updateStudentJourneyStage } from '../../api/students';
 import JourneyTab from './JourneyTab';
 import ChatTab from './ChatTab';
+import StudentInfoTab from './StudentInfoTab';
 import type { ChatMessage, JourneyStage, JourneyStageStatus, Student } from '../../types';
 
 const TABS: TabItem[] = [
   { key: 'journey', label: 'Journey', icon: <Milestone size={15} /> },
   { key: 'chats', label: 'Chats', icon: <MessageCircle size={15} /> },
+  { key: 'sif', label: 'SIF', icon: <ClipboardList size={15} /> },
 ];
 
 interface StudentDetailPanelProps {
@@ -52,6 +54,19 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
     onStudentUpdated(s);
   };
 
+  // Opening the SIF tab re-pulls the student so the LOR/SOP the student
+  // filled in on the app shows up even if this panel was opened earlier.
+  useEffect(() => {
+    if (activeTab !== 'sif') return;
+    fetchStudentById(studentId)
+      .then((s) => {
+        setStudent(s);
+        onStudentUpdated(s);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, studentId]);
+
   const remarksByStage = useMemo(() => {
     const map = new Map<string, ChatMessage>();
     for (const msg of messages) {
@@ -87,11 +102,17 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4">
-      <div className="flex shrink-0 items-center gap-2">
-        <button onClick={onBack} className="text-slate-400 hover:text-slate-600">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto">
+        <button onClick={onBack} className="shrink-0 text-slate-400 hover:text-slate-600">
           <ArrowLeft size={20} />
         </button>
-        <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} layoutId="student-detail-tab" />
+        <Tabs
+          tabs={TABS}
+          active={activeTab}
+          onChange={setActiveTab}
+          layoutId="student-detail-tab"
+          className="shrink-0"
+        />
       </div>
 
       <div className="min-h-0 flex-1">
@@ -100,6 +121,7 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
             <JourneyTab
               journey={journey}
               remarksByStage={remarksByStage}
+              isClosed={student.status === 'Closed'}
               onStatusChange={async (title, status: JourneyStageStatus) => {
                 await updateStudentJourneyStage(student.id, title, status);
                 const j = await fetchStudentJourney(student.id);
@@ -113,6 +135,18 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
               }}
             />
           </div>
+        ) : activeTab === 'sif' ? (
+          <StudentInfoTab
+            // Remount (and re-seed the form) whenever the student changes or
+            // their SIF was updated server-side — e.g. the student just
+            // saved it from the app.
+            key={`${student.id}:${student.sif?.updatedAt ?? 'none'}`}
+            student={student}
+            onStudentUpdated={(s) => {
+              setStudent(s);
+              onStudentUpdated(s);
+            }}
+          />
         ) : (
           <ChatTab
             studentId={student.id}
@@ -124,6 +158,7 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
             messages={messages}
             setMessages={setMessages}
             onAfterChange={refreshStudent}
+            isClosed={student.status === 'Closed'}
           />
         )}
       </div>

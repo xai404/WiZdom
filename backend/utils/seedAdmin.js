@@ -15,9 +15,12 @@ const seed = async () => {
     process.exit(1);
   }
 
-  const existing = await Admin.findOne({ email });
+  // Only one Admin account is ever meant to exist — the app's "call super
+  // admin" lookups (supportContactsController.js) grab it with a plain
+  // findOne(), so a second admin with a different email silently breaks that.
+  const existing = await Admin.findOne();
   if (existing) {
-    console.log(`Admin already exists: ${email}`);
+    console.log(`Admin already exists: ${existing.email} — refusing to create a second admin account.`);
     process.exit(0);
   }
 

@@ -69,3 +69,14 @@ export const updateEmployee = async (id: string, payload: Record<string, unknown
 export const deleteEmployee = async (id: string): Promise<void> => {
   await api.delete(`/employees/${id}`);
 };
+
+// Departments with at least one active employee — used to filter the chat
+// "tag a team" picker down to teams that can actually pick the tag up.
+// Tagging an unstaffed department (e.g. zero active employees) would set
+// the student's awaitingReply/responsibleDepartment and then never
+// auto-resolve, since that only happens when an employee FROM that
+// department replies.
+export const fetchActiveDepartments = async (): Promise<string[]> => {
+  const res = await api.get('/employees/departments/active');
+  return res.data.departments;
+};

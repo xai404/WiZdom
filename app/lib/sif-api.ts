@@ -1,115 +1,6 @@
-export type UserRole = 'super_admin' | 'admin' | 'manager' | 'staff' | 'co_admin';
+import { API_BASE_URL } from '@/constants/config';
 
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  phone?: string;
-  profilePicture?: string | null;
-  createdAt: string;
-}
-
-export interface WaitingStudent {
-  id: string;
-  name: string;
-  responsibleDepartment: string | null;
-  awaitingSince: string | null;
-}
-
-export interface DashboardStats {
-  totalStudents?: number;
-  activeStudents?: number;
-  totalEmployees?: number;
-  activeEmployees?: number;
-  byDepartment?: { department: string; count: number }[];
-  waitingStudents?: WaitingStudent[];
-}
-
-export const EMPLOYEE_DEPARTMENTS = ['Editing', 'Application', 'Counselling', 'Admin', 'Visa', 'Finance'] as const;
-export type EmployeeDepartment = (typeof EMPLOYEE_DEPARTMENTS)[number];
-
-export type EmployeeRole = 'admin' | 'manager' | 'staff' | 'co_admin';
-
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  department: string;
-  designation?: string;
-  role?: EmployeeRole;
-  profilePicture?: string | null;
-  isActive?: boolean;
-  createdAt?: string;
-}
-
-export const STUDENT_STATUSES = ['Active', 'Inactive', 'Closed'] as const;
-export type StudentStatus = (typeof STUDENT_STATUSES)[number];
-
-export const PAYMENT_STATUSES = ['Paid in Full', 'Half Payment', 'Free'] as const;
-export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
-
-// Denormalized audit snapshot — who created/last updated a student record.
-// Shared shape for both createdBy and updatedBy.
-export interface StudentAuditor {
-  id: string;
-  name: string;
-  role: string;
-}
-
-// Response-status accountability layer — 'awaiting' always overrides
-// 'resolved' even if the journey happens to be complete (someone still
-// needs to reply right now). See backend/models/Student.js.
-export type ResponseStatus = 'awaiting' | 'in_progress' | 'resolved';
-
-export interface ResponseHandler {
-  id: string;
-  name: string;
-  department: string;
-}
-
-export interface Student {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  gender?: string;
-  countryInterested?: string[];
-  intakeMonth?: number;
-  intakeYear?: number;
-  isActive: boolean;
-  status?: StudentStatus;
-  // Free-text "Counselled By" name — not a ref to an Employee record.
-  assignedCounsellor?: string;
-  // Free-text batch/cohort label — shown above the student's own name on
-  // StudentCard.
-  groupName?: string;
-  paymentStatus?: PaymentStatus | null;
-  createdBy?: StudentAuditor | null;
-  updatedBy?: StudentAuditor | null;
-  updatedAt?: string;
-  lastLoginAt?: string;
-  createdAt: string;
-  responsibleDepartment?: string | null;
-  awaitingReply: boolean;
-  awaitingSince?: string | null;
-  awaitingSinceMessageId?: string | null;
-  lastHandledBy?: ResponseHandler | null;
-  lastHandledAt?: string | null;
-  journeyCompleted: boolean;
-  responseStatus: ResponseStatus;
-  // Raw per-stage progress — used by StudentCard to derive its
-  // pipeline-milestone outline (Documentation/Offer/Visa). Absent stages
-  // default to 'pending' server-side, so this can be a sparse/empty array.
-  journey?: JourneyStage[];
-  // LOR/SOP intake notes captured on the SIF tab. Admin-facing only.
-  sif?: Sif;
-}
-
-// Student Information Form — free-text notes staff collect to draft the
-// student's LOR(s) and SOP. See backend/models/Student.js sifSchema.
-export interface LorRecommender {
+export type LorRecommender = {
   professorName: string;
   contactPhone: string;
   contactEmail: string;
@@ -118,20 +9,19 @@ export interface LorRecommender {
   subjectsTopics: string;
   projects: string;
   internshipsActivities: string;
-}
+};
 
-export interface SopDetails {
+export type SopDetails = {
   courseName: string;
   motivation: string;
   additionalInfo: string;
   expectationsToLearn: string;
   futurePlans: string;
-}
+};
 
 // Study-preference answers carried over from the CRM Student Interest Form,
-// pre-filled when the account is provisioned on lead conversion and
-// editable here afterwards. See backend/models/Student.js interestFormSchema.
-export interface InterestForm {
+// pre-filled when the account is provisioned and editable here afterwards.
+export type InterestForm = {
   applicantName: string;
   mobile: string;
   email: string;
@@ -146,12 +36,11 @@ export interface InterestForm {
   alternateContact: string;
   agreedToTerms: boolean;
   sourcedFromCrmAt?: string | null;
-}
+};
 
-// Personal / passport details + academic history — the middle block of the
-// paper SIF, filled by the student in the app and viewable/editable by
-// staff here. See backend/models/Student.js personalDetailsSchema.
-export interface PersonalDetails {
+// Personal / passport details — the middle block of the paper SIF, filled
+// by the student in the app.
+export type PersonalDetails = {
   dateOfBirth: string;
   address: string;
   previousVisaRejection: '' | 'yes' | 'no';
@@ -163,9 +52,9 @@ export interface PersonalDetails {
   passportNumber: string;
   passportDateOfIssue: string;
   passportDateOfExpiry: string;
-}
+};
 
-export interface AcademicQualification {
+export type AcademicQualification = {
   level: string;
   specializationSubjects: string;
   yearOfPassing: string;
@@ -173,8 +62,9 @@ export interface AcademicQualification {
   backlogs: string;
   schoolCollegeName: string;
   boardUniversity: string;
-}
+};
 
+// Fixed row labels for the Academic Qualification table (mirrors the paper form).
 export const ACADEMIC_LEVELS = [
   '10',
   '11/12',
@@ -185,21 +75,23 @@ export const ACADEMIC_LEVELS = [
   'Gaps between education (if any)',
 ];
 
-export interface InternshipRow {
+// One row of the "Internship / Industry Experience" table.
+export type InternshipRow = {
   nameOfEmployer: string;
   addressOfEmployer: string;
   designation: string;
   salaryMonthly: string;
   dateFrom: string;
   dateTo: string;
-}
+};
 
-export interface DocumentChecklistItem {
+// "Document Ready With You" checklist row.
+export type DocumentChecklistItem = {
   key: string;
   name: string;
   format: string;
   ready: '' | 'yes' | 'no';
-}
+};
 
 export const DOCUMENT_CHECKLIST_TEMPLATE: {
   key: string;
@@ -228,7 +120,7 @@ export const DOCUMENT_CHECKLIST_TEMPLATE: {
   { key: 'visa_sop', name: 'Visa SOP post Admission', format: 'YOURNAME_VisaSOP.doc', optional: true, section: 'developed' },
 ];
 
-export interface Sif {
+export type Sif = {
   lor: LorRecommender[];
   interestForm: InterestForm;
   personalDetails: PersonalDetails;
@@ -238,7 +130,7 @@ export interface Sif {
   sop: SopDetails;
   updatedAt?: string | null;
   updatedByName?: string | null;
-}
+};
 
 export const EMPTY_LOR_RECOMMENDER: LorRecommender = {
   professorName: '',
@@ -300,6 +192,7 @@ export const EMPTY_ACADEMIC_QUALIFICATION: AcademicQualification = {
   boardUniversity: '',
 };
 
+// The default table — one empty row per fixed level.
 export const buildDefaultAcademicQualifications = (): AcademicQualification[] =>
   ACADEMIC_LEVELS.map((level) => ({ ...EMPTY_ACADEMIC_QUALIFICATION, level }));
 
@@ -315,51 +208,102 @@ export const EMPTY_INTERNSHIP_ROW: InternshipRow = {
 export const buildDefaultDocumentChecklist = (): DocumentChecklistItem[] =>
   DOCUMENT_CHECKLIST_TEMPLATE.map(({ key, name, format }) => ({ key, name, format, ready: '' as const }));
 
-export type JourneyStageStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
+const strArray = (v: any): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
 
-export interface JourneyStage {
-  title: string;
-  status: JourneyStageStatus;
-  updatedAt: string | null;
+function normalizeInterestForm(raw: any): InterestForm {
+  return {
+    ...EMPTY_INTEREST_FORM,
+    ...(raw ?? {}),
+    preferredCountries: strArray(raw?.preferredCountries),
+    preferredStreams: strArray(raw?.preferredStreams),
+    entranceTestSupport: strArray(raw?.entranceTestSupport),
+    admissionSupport: strArray(raw?.admissionSupport),
+    agreedToTerms: raw?.agreedToTerms === true,
+  };
 }
 
-export type MessageSender = 'admin' | 'student';
-
-export interface ChatMessage {
-  _id: string;
-  sender: MessageSender;
-  senderName: string;
-  senderRole: string | null;
-  // The Admin/Employee account id that sent this (null for student
-  // messages) — used to tell "a message I sent" apart from "a message a
-  // different staff member sent" for chat bubble alignment.
-  senderId: string | null;
-  text: string;
-  stage: string | null;
-  department: string | null;
-  readByStudent: boolean;
-  readByAdmin: boolean;
-  // True once every OTHER participant (every other active staff account,
-  // plus the student when the sender is staff) has read this message —
-  // the WhatsApp-group "blue tick" condition. Computed fresh per request
-  // server-side; drives the tick color instead of the simpler
-  // readByStudent/readByAdmin booleans, which only mean "read by someone".
-  fullyRead: boolean;
-  deleted: boolean;
-  edited: boolean;
-  replyTo: string | null;
-  pinned: boolean;
-  createdAt: string;
+function normalizeAcademicQualifications(raw: any): AcademicQualification[] {
+  const rows: AcademicQualification[] = Array.isArray(raw)
+    ? raw.map((r: any) => ({ ...EMPTY_ACADEMIC_QUALIFICATION, ...(r ?? {}) }))
+    : [];
+  if (!rows.length) return buildDefaultAcademicQualifications();
+  // Make sure every fixed level is represented (in order), keeping any
+  // extra custom rows the student added at the end.
+  const byLevel = new Map(rows.map((r) => [r.level, r]));
+  const ordered = ACADEMIC_LEVELS.map(
+    (level) => byLevel.get(level) ?? { ...EMPTY_ACADEMIC_QUALIFICATION, level },
+  );
+  const extras = rows.filter((r) => !ACADEMIC_LEVELS.includes(r.level));
+  return [...ordered, ...extras];
 }
 
-export interface AppNotification {
-  _id: string;
-  type: 'stage_status' | 'remark' | 'message' | 'department_tag';
-  title: string;
-  body: string;
-  stage: string | null;
-  department: string | null;
-  student: { _id: string; name: string } | null;
-  read: boolean;
-  createdAt: string;
+function normalizeDocumentChecklist(raw: any): DocumentChecklistItem[] {
+  const saved = new Map<string, any>(
+    Array.isArray(raw) ? raw.filter((r) => r?.key).map((r) => [r.key, r]) : [],
+  );
+  return DOCUMENT_CHECKLIST_TEMPLATE.map(({ key, name, format }) => {
+    const r = saved.get(key);
+    const ready = r?.ready === 'yes' || r?.ready === 'no' ? r.ready : '';
+    return { key, name, format, ready };
+  });
+}
+
+function normalizeSif(raw: any): Sif {
+  return {
+    lor: Array.isArray(raw?.lor)
+      ? raw.lor.map((r: any) => ({ ...EMPTY_LOR_RECOMMENDER, ...(r ?? {}) }))
+      : [],
+    interestForm: normalizeInterestForm(raw?.interestForm),
+    personalDetails: { ...EMPTY_PERSONAL_DETAILS, ...(raw?.personalDetails ?? {}) },
+    academicQualifications: normalizeAcademicQualifications(raw?.academicQualifications),
+    internshipExperience: Array.isArray(raw?.internshipExperience)
+      ? raw.internshipExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
+      : [],
+    documentChecklist: normalizeDocumentChecklist(raw?.documentChecklist),
+    sop: { ...EMPTY_SOP, ...(raw?.sop ?? {}) },
+    updatedAt: raw?.updatedAt ?? null,
+    updatedByName: raw?.updatedByName ?? null,
+  };
+}
+
+export async function fetchMySif(token: string): Promise<Sif> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/student/sif`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check your connection and try again.');
+  }
+
+  // 404 = nothing saved yet (or the endpoint isn't live) — treat it as an
+  // empty form rather than an error, so the questions always render.
+  if (response.status === 404) return normalizeSif(null);
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || 'Unable to load your information form right now.');
+  }
+  return normalizeSif(data.sif);
+}
+
+export async function updateMySif(token: string, sif: Sif): Promise<Sif> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/student/sif`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ sif }),
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check your connection and try again.');
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || 'Unable to save your information form right now.');
+  }
+  return normalizeSif(data.sif);
 }

@@ -92,14 +92,15 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: inactiveColor,
           tabBarStyle: {
             backgroundColor: isDark ? '#0b1220' : '#ffffff',
-            borderTopWidth: 0,
+            borderTopWidth: isDark ? 0 : 1,
+            borderTopColor: '#eef2f7',
             height: 70 + barBottomPadding,
             paddingTop: 10,
             paddingBottom: barBottomPadding,
             shadowColor: '#0f172a',
-            shadowOpacity: isDark ? 0 : 0.06,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: isDark ? 0 : 0.08,
+            shadowRadius: 20,
+            shadowOffset: { width: 0, height: -6 },
             elevation: 12,
           },
           tabBarItemStyle: { paddingVertical: 4 },
@@ -127,6 +128,14 @@ export default function TabsLayout() {
             tabBarIcon: renderTab('chatbubble-ellipses-outline', 'chatbubble-ellipses', 'Chats'),
             tabBarLabel: renderLabel('Chats'),
             tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          }}
+        />
+        <Tabs.Screen
+          name="sif"
+          options={{
+            title: 'SIF',
+            tabBarIcon: renderTab('clipboard-outline', 'clipboard', 'SIF'),
+            tabBarLabel: renderLabel('SIF'),
           }}
         />
         <Tabs.Screen

@@ -39,15 +39,15 @@ export function AppHeader() {
       end={{ x: 1, y: 1 }}
       style={{
         paddingTop: 14,
-        paddingBottom: 18,
+        paddingBottom: 20,
         paddingHorizontal: 16,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        shadowColor: '#0049B7',
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 8,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        shadowColor: '#001B47',
+        shadowOpacity: 0.26,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 12 },
+        elevation: 10,
       }}>
       <View className="w-full max-w-2xl flex-row items-center justify-between self-center">
         <View className="flex-1">
@@ -109,7 +109,12 @@ export function AppHeader() {
                 justifyContent: 'center',
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 borderWidth: 1.5,
-                borderColor: 'rgba(255,255,255,0.4)',
+                borderColor: 'rgba(255,255,255,0.45)',
+                shadowColor: '#000',
+                shadowOpacity: 0.18,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 4,
               }}>
               <Text className="text-sm font-bold text-white">{getInitials(user?.name)}</Text>
             </View>

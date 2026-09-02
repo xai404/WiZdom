@@ -45,9 +45,10 @@ export function ProgressTimeline() {
   const completed = journey?.filter((s) => s.status === 'completed').length ?? 0;
   const inProgress = journey?.filter((s) => s.status === 'in_progress').length ?? 0;
   const pending = journey?.filter((s) => s.status === 'pending').length ?? 0;
+  const rejected = journey?.filter((s) => s.status === 'rejected').length ?? 0;
   const total = journey?.length ?? 0;
 
-  const counts: Record<FilterKey, number> = { all: total, completed, in_progress: inProgress, pending };
+  const counts: Record<FilterKey, number> = { all: total, completed, in_progress: inProgress, pending, rejected };
 
   const filteredJourney = useMemo(() => {
     if (!journey) return journey;

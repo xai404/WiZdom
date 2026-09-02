@@ -4,14 +4,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +23,7 @@ import { ChatBackground } from '@/components/chat-background';
 import { ChatHeader } from '@/components/chat-header';
 import { EmptyState } from '@/components/empty-state';
 import { LottieLoader } from '@/components/lottie-loader';
+import { DEPARTMENTS } from '@/constants/departments';
 import { getStageMetaBySlug, getStageMetaByTitle } from '@/constants/journey-meta';
 import { useAuth } from '@/context/auth-context';
 import { useChat } from '@/context/chat-context';
@@ -30,6 +34,11 @@ import { formatDateSeparator, formatMessageTime } from '@/lib/format-date';
 
 const PRIMARY = '#0049B7';
 const ACCENT = '#3B82F6';
+
+// A message can only be edited within this window of sending it — mirrors
+// the backend guard in studentChatController.editMyMessage; this just keeps
+// the option from being offered once it would be rejected anyway.
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
 
 type ListItem =
   | { type: 'separator'; id: string; label: string }
@@ -61,23 +70,25 @@ export default function GroupChatScreen() {
   const params = useLocalSearchParams<{ stage?: string }>();
   const { isDark } = useAppTheme();
   const { token } = useAuth();
-  const { messages, loading, error, reload, sendReply, markRead, unreadCount } = useChat();
+  const { messages, loading, error, reload, sendReply, deleteMessage, editMessage, markRead, unreadCount } = useChat();
   const isFocused = useIsFocused();
 
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [taggedDepartment, setTaggedDepartment] = useState<string | null>(null);
   const [showDeptPicker, setShowDeptPicker] = useState(false);
-  // Starts empty and is populated only from GET /api/student/departments —
-  // never falls back to the full DEPARTMENTS list, staffed or not. Tagging
-  // an unstaffed department would open an "awaiting reply" nothing can ever
-  // auto-resolve, so the picker must only ever offer departments the fetch
-  // actually confirmed have an active employee. See lib/departments-api.ts.
-  const [taggableDepartments, setTaggableDepartments] = useState<string[]>([]);
+  // Shows every department by default, and narrows to only the ones with
+  // an active employee once GET /api/student/departments resolves — that
+  // route isn't live on the deployed API yet, so this fallback keeps the
+  // picker usable in the meantime instead of showing "no teams available".
+  // See lib/departments-api.ts.
+  const [taggableDepartments, setTaggableDepartments] = useState<string[]>([...DEPARTMENTS]);
 
   useEffect(() => {
     if (!token) return;
-    fetchActiveDepartments(token).then(setTaggableDepartments);
+    fetchActiveDepartments(token).then((depts) => {
+      if (depts.length > 0) setTaggableDepartments(depts);
+    });
   }, [token]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -198,6 +209,16 @@ export default function GroupChatScreen() {
     });
   }, [params.stage, messages, items, triggerHighlight]);
 
+  const handleDeleteMessage = useCallback(
+    (message: ChatMessage) => {
+      Alert.alert('Delete message?', 'This will remove the message for everyone in this chat.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMessage(message._id) },
+      ]);
+    },
+    [deleteMessage]
+  );
+
   const handleSend = () => {
     if (!draft.trim()) return;
     sendReply(draft, replyingTo?.stage ?? null, replyingTo?._id ?? null, taggedDepartment);
@@ -302,6 +323,8 @@ export default function GroupChatScreen() {
                     highlightOpacity={highlightOpacity}
                     quoted={item.message.replyTo ? (messagesById.get(item.message.replyTo) ?? null) : null}
                     onReply={() => setReplyingTo(item.message)}
+                    onDelete={() => handleDeleteMessage(item.message)}
+                    onEditSave={(text) => editMessage(item.message._id, text)}
                     onJumpToQuoted={scrollToMessageId}
                   />
                 );
@@ -553,6 +576,8 @@ function MessageRow({
   highlightOpacity,
   quoted,
   onReply,
+  onDelete,
+  onEditSave,
   onJumpToQuoted,
 }: {
   message: ChatMessage;
@@ -562,11 +587,43 @@ function MessageRow({
   highlightOpacity: Animated.Value;
   quoted: ChatMessage | null;
   onReply: () => void;
+  onDelete: () => void;
+  onEditSave: (text: string) => Promise<void>;
   onJumpToQuoted: (id: string) => void;
 }) {
   const isAdmin = message.sender === 'admin';
   const senderDisplay = getSenderDisplay(message);
   const stageMeta = message.stage ? getStageMetaByTitle(message.stage) : null;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(message.text);
+  const [savingEdit, setSavingEdit] = useState(false);
+  // Only the student's own, not-deleted messages, and only for the first
+  // 10 minutes — same rule the Admin Panel applies to staff messages.
+  const canEdit = !isAdmin && !message.deleted && Date.now() - new Date(message.createdAt).getTime() < EDIT_WINDOW_MS;
+
+  const startEdit = () => {
+    setEditDraft(message.text);
+    setIsEditing(true);
+  };
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditDraft(message.text);
+  };
+  const saveEdit = async () => {
+    const trimmed = editDraft.trim();
+    if (!trimmed || trimmed === message.text) {
+      cancelEdit();
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await onEditSave(trimmed);
+      setIsEditing(false);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const fade = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
@@ -579,20 +636,102 @@ function MessageRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const replyButton = (
-    <Pressable
-      onPress={onReply}
-      hitSlop={8}
-      className="h-7 w-7 items-center justify-center self-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
-      <Ionicons name="arrow-undo-outline" size={15} color={isDark ? '#64748b' : '#94a3b8'} />
-    </Pressable>
+  // One "⋮" menu per message instead of a row of loose icons: tap it to get
+  // Reply / Edit / Delete (Edit + Delete only on the student's own,
+  // not-deleted, still-editable messages — mirrors the Admin Panel's
+  // per-bubble menu). Positioned against the trigger with measureInWindow
+  // and shown in a Modal so it floats above the FlatList without being
+  // clipped by a row near the screen edge.
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const kebabRef = useRef<View>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  const menuItems: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }[] = [
+    { icon: 'arrow-undo-outline', label: 'Reply', onPress: onReply },
+    ...(canEdit ? [{ icon: 'pencil-outline' as const, label: 'Edit', onPress: startEdit }] : []),
+    ...(!isAdmin && !message.deleted ? [{ icon: 'trash-outline' as const, label: 'Delete', onPress: onDelete, danger: true }] : []),
+  ];
+
+  const MENU_WIDTH = 168;
+  const openMenu = () => {
+    kebabRef.current?.measureInWindow((x, y, w, h) => {
+      const estHeight = menuItems.length * 46 + 10;
+      let top = y + h + 6;
+      if (top + estHeight > screenH - 24) top = Math.max(24, y - estHeight - 6);
+      let left = isAdmin ? x : x + w - MENU_WIDTH;
+      left = Math.min(Math.max(left, 8), screenW - MENU_WIDTH - 8);
+      setMenuPos({ top, left });
+      setMenuOpen(true);
+    });
+  };
+  const runItem = (fn: () => void) => {
+    setMenuOpen(false);
+    // let the menu Modal finish dismissing before opening an Alert (delete)
+    // or swapping the bubble into edit mode — stacking either on top of a
+    // still-animating Modal is flaky on both platforms.
+    setTimeout(fn, 160);
+  };
+
+  const kebabButton =
+    message.deleted || isEditing ? null : (
+      <Pressable
+        ref={kebabRef}
+        onPress={openMenu}
+        hitSlop={8}
+        className="h-7 w-7 items-center justify-center self-center rounded-full active:bg-slate-100 dark:active:bg-slate-800">
+        <Ionicons name="ellipsis-vertical" size={15} color={isDark ? '#64748b' : '#94a3b8'} />
+      </Pressable>
+    );
+
+  const menu = (
+    <Modal transparent visible={menuOpen} animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+      <Pressable className="flex-1" onPress={() => setMenuOpen(false)}>
+        {menuPos ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: menuPos.top,
+              left: menuPos.left,
+              width: MENU_WIDTH,
+              borderRadius: 14,
+              paddingVertical: 5,
+              backgroundColor: isDark ? '#1c2740' : '#ffffff',
+              borderWidth: 1,
+              borderColor: isDark ? '#334155' : '#e8ecf3',
+              shadowColor: '#0f172a',
+              shadowOpacity: 0.18,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 8,
+            }}>
+            {menuItems.map((item) => (
+              <Pressable
+                key={item.label}
+                onPress={() => runItem(item.onPress)}
+                className="flex-row items-center gap-3 px-4 py-2.5 active:bg-slate-100 dark:active:bg-slate-800">
+                <Ionicons
+                  name={item.icon}
+                  size={16}
+                  color={item.danger ? '#ef4444' : isDark ? '#cbd5e1' : '#475569'}
+                />
+                <Text
+                  className={`text-[14px] ${item.danger ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </Pressable>
+    </Modal>
   );
 
   return (
     <Animated.View style={{ opacity: fade, transform: [{ translateY }] }}>
       <Pressable onLongPress={onReply} delayLongPress={280}>
         <View className={`mb-4 flex-row items-center ${isAdmin ? 'justify-start' : 'justify-end'}`}>
-          {!isAdmin ? replyButton : null}
+          {!isAdmin ? kebabButton : null}
           {isAdmin ? (
             <LinearGradient
               colors={isDark ? ['#25324d', '#1c2740'] : ['#dbe9ff', '#eef5ff']}
@@ -641,6 +780,45 @@ function MessageRow({
                   }}>
                   <MessageBubbleContent message={message} quoted={quoted} stageMeta={stageMeta} isAdmin isDark={isDark} onJumpToQuoted={onJumpToQuoted} />
                 </View>
+              ) : isEditing ? (
+                <View
+                  style={{
+                    minWidth: 220,
+                    borderRadius: 22,
+                    borderTopRightRadius: 6,
+                    borderWidth: 1,
+                    borderColor: isDark ? '#334155' : '#c7d2fe',
+                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                    paddingHorizontal: 14,
+                    paddingVertical: 11,
+                  }}>
+                  <TextInput
+                    autoFocus
+                    multiline
+                    value={editDraft}
+                    onChangeText={setEditDraft}
+                    editable={!savingEdit}
+                    className="text-[15px] text-slate-800 dark:text-slate-100"
+                    style={{ minHeight: 38, padding: 0 }}
+                  />
+                  <View className="mt-2 flex-row items-center justify-end gap-2">
+                    <Pressable
+                      onPress={cancelEdit}
+                      disabled={savingEdit}
+                      hitSlop={6}
+                      className="rounded-lg px-2.5 py-1 active:bg-slate-100 dark:active:bg-slate-800">
+                      <Text className="text-[12px] font-medium text-slate-500 dark:text-slate-400">Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={saveEdit}
+                      disabled={savingEdit || !editDraft.trim()}
+                      hitSlop={6}
+                      className="rounded-lg px-3 py-1 active:opacity-80"
+                      style={{ backgroundColor: PRIMARY, opacity: savingEdit || !editDraft.trim() ? 0.5 : 1 }}>
+                      <Text className="text-[12px] font-semibold text-white">{savingEdit ? 'Saving…' : 'Save'}</Text>
+                    </Pressable>
+                  </View>
+                </View>
               ) : (
                 <LinearGradient
                   colors={[ACCENT, PRIMARY]}
@@ -664,6 +842,9 @@ function MessageRow({
 
             <View className={`mt-1.5 flex-row items-center gap-1 ${isAdmin ? 'ml-1 justify-start' : 'mr-1 justify-end'}`}>
               <Text className="text-[11px] text-slate-400 dark:text-slate-500">{formatMessageTime(message.createdAt)}</Text>
+              {message.edited && !message.deleted ? (
+                <Text className="text-[11px] text-slate-400 dark:text-slate-500">· edited</Text>
+              ) : null}
               {!isAdmin ? (
                 <Ionicons
                   name="checkmark-done"
@@ -673,9 +854,10 @@ function MessageRow({
               ) : null}
             </View>
           </View>
-          {isAdmin ? replyButton : null}
+          {isAdmin ? kebabButton : null}
         </View>
       </Pressable>
+      {menu}
     </Animated.View>
   );
 }

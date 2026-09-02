@@ -38,9 +38,22 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Student-facing feed only (department: null): a single account owns the
+    // row, so one boolean is enough. Staff-facing rows (department set) use
+    // `readBy` below instead — every staff account sees the same row and
+    // each marks it read independently.
     read: {
       type: Boolean,
       default: false,
+    },
+    // Per-account read tracking for STAFF-facing notifications. Holds the
+    // Admin/Employee _id of every staff member who has marked this row read;
+    // the admin bell derives its per-user `read` flag and unread count from
+    // whether the requesting account's id is in here. Never used for
+    // student-facing rows.
+    readBy: {
+      type: [mongoose.Schema.Types.ObjectId],
+      default: [],
     },
   },
   { timestamps: true }

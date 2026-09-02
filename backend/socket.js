@@ -83,8 +83,18 @@ function buildChatMessagePayload(message, studentId) {
     fullyRead: obj.fullyRead,
     pinned: obj.pinned,
     deleted: obj.deleted,
+    edited: obj.edited ?? false,
     createdAt: obj.createdAt,
   };
+}
+
+// Strips the staff-only fields off a chat payload before it goes to the
+// student's room — same split emitChatMessage applies to a new message.
+function toStudentChatPayload(payload) {
+  const studentPayload = { ...payload };
+  delete studentPayload.senderId;
+  if (studentPayload.sender === 'admin') delete studentPayload.department;
+  return studentPayload;
 }
 
 // Emits a just-saved chat message to the student's own room and to every
@@ -100,12 +110,33 @@ function emitChatMessage(message, studentId) {
 
   const payload = buildChatMessagePayload(message, studentId);
 
-  const studentPayload = { ...payload };
-  delete studentPayload.senderId;
-  if (studentPayload.sender === 'admin') delete studentPayload.department;
-
-  io.to(`student:${studentId}`).emit('chat:new-message', studentPayload);
+  io.to(`student:${studentId}`).emit('chat:new-message', toStudentChatPayload(payload));
   io.to('staff').emit('chat:new-message', payload);
+}
+
+// Emits after an EXISTING chat message changes in place — an edit (new
+// text + `edited`), a soft-delete (`deleted`), or a pin toggle. Same
+// student/staff room split as emitChatMessage; listeners replace the
+// message by `_id` rather than appending. Called only after the change is
+// persisted.
+function emitChatMessageUpdated(message, studentId) {
+  if (!io) return;
+
+  const payload = buildChatMessagePayload(message, studentId);
+
+  io.to(`student:${studentId}`).emit('chat:message-updated', toStudentChatPayload(payload));
+  io.to('staff').emit('chat:message-updated', payload);
+}
+
+// Emits after an admin hard-clears a student's entire Group Chat thread
+// (adminChatController.clearStudentChat) so both the student app and every
+// staff chat view empty the thread immediately instead of on their next poll.
+function emitChatThreadCleared(studentId) {
+  if (!io) return;
+
+  const payload = { studentId: studentId.toString() };
+  io.to(`student:${studentId}`).emit('chat:thread-cleared', payload);
+  io.to('staff').emit('chat:thread-cleared', payload);
 }
 
 // Emits after a journey stage's status is saved — only the affected
@@ -123,9 +154,79 @@ function emitProgressUpdate(studentId, stage) {
   });
 }
 
+// Emits after an admin edits a student's own record (name, contact info,
+// payment status, pipeline status, etc. — see studentsController.updateStudent)
+// so the signed-in student's app reflects the change immediately instead of
+// waiting for their next login/getMe. Uses the same student-facing
+// toSafeObject(false) shape the app already stores as its AuthUser, so the
+// listener can apply the payload directly.
+function emitStudentProfileUpdated(student) {
+  if (!io) return;
+
+  const payload = student.toSafeObject(false);
+  io.to(`student:${student._id}`).emit('student:profile-updated', {
+    ...payload,
+    id: payload.id.toString(),
+  });
+}
+
+// Emits after a staff-facing Notification row is created (see
+// utils/notify.js) so the Admin Panel's notification bell updates in real
+// time instead of waiting for its next 15s poll. Payload is deliberately
+// minimal — a ping telling the bell to re-fetch, keeping the server the
+// single source of truth for per-account scoping and the unread count.
+function emitStaffNotification(notification) {
+  if (!io) return;
+
+  io.to('staff').emit('notification:new', {
+    _id: notification._id ? notification._id.toString() : null,
+    type: notification.type ?? null,
+    department: notification.department ?? null,
+    createdAt: notification.createdAt ?? new Date().toISOString(),
+  });
+}
+
+// Emits after a STUDENT-facing Notification row is created (see
+// utils/notify.js) so the app's Notifications screen / bell updates in real
+// time instead of depending entirely on an Expo push landing (Expo Go, OS
+// battery optimizations, denied permissions all break that). Payload is
+// deliberately minimal — a ping telling the app to re-fetch, keeping the
+// server the single source of truth for the list and unread count. Mirrors
+// emitStaffNotification, scoped to the student's own room.
+function emitStudentNotification(notification, studentId) {
+  if (!io) {
+    console.log('[socket] emitStudentNotification skipped — io not initialised');
+    return;
+  }
+
+  const room = `student:${studentId}`;
+  const clients = io.sockets.adapter.rooms.get(room);
+  console.log(
+    `[socket] emit notification:new -> ${room} (${clients ? clients.size : 0} connected client(s))`
+  );
+
+  io.to(room).emit('notification:new', {
+    studentId: studentId.toString(),
+    _id: notification._id ? notification._id.toString() : null,
+    type: notification.type ?? null,
+    stage: notification.stage ?? null,
+    createdAt: notification.createdAt ?? new Date().toISOString(),
+  });
+}
+
 function getIO() {
   if (!io) throw new Error('Socket.IO has not been initialized yet');
   return io;
 }
 
-module.exports = { initSocket, getIO, emitChatMessage, emitProgressUpdate };
+module.exports = {
+  initSocket,
+  getIO,
+  emitChatMessage,
+  emitChatMessageUpdated,
+  emitChatThreadCleared,
+  emitProgressUpdate,
+  emitStudentProfileUpdated,
+  emitStaffNotification,
+  emitStudentNotification,
+};

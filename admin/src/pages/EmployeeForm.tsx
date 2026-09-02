@@ -16,10 +16,10 @@ import { generateStrongPassword } from '../utils/generatePassword';
 const DEPARTMENT_OPTIONS = [
   { label: 'Editing', value: 'Editing' },
   { label: 'Application', value: 'Application' },
-  { label: 'Visa', value: 'Visa' },
-  { label: 'Bank/Finance', value: 'Finance' },
-  { label: 'Human Resource', value: 'Human Resources' },
+  { label: 'Counselling', value: 'Counselling' },
   { label: 'Admin', value: 'Admin' },
+  { label: 'Visa', value: 'Visa' },
+  { label: 'Finance', value: 'Finance' },
 ] as const;
 
 const ROLE_OPTIONS = [

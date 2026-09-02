@@ -31,9 +31,14 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       // Clear any previous student's data on logout — otherwise it lingers
       // in memory and can flash briefly when a different student logs in
       // on the same device before their own fetch resolves.
+      // No "session expired" banner here — logout (including the forced
+      // one when an account is closed, see auth-context.tsx) already
+      // navigates straight to /login, so this screen won't stay mounted
+      // long enough for a message to matter; showing one anyway would
+      // needlessly flash on top of that redirect.
       setJourney(null);
       setLoading(false);
-      setError('Your session has expired. Please log in again.');
+      setError(null);
       return;
     }
     setLoading(true);

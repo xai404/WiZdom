@@ -1,7 +1,20 @@
 import { GraduationCap, Loader2, Plus } from 'lucide-react';
-import { Button, SearchInput, Skeleton } from '../ui';
+import { Button, SearchInput, Select, Skeleton } from '../ui';
+import type { StudentMilestoneFilter } from '../../api/students';
 import type { Student } from '../../types';
 import StudentCard from './StudentCard';
+
+// The single "Filter" dropdown above the list — same set on admin and
+// employee accounts. Values match studentsController.getStudents' milestone
+// param.
+const MILESTONE_OPTIONS: { value: StudentMilestoneFilter; label: string }[] = [
+  { value: 'documentation_completed', label: 'Documentation Completed' },
+  { value: 'offer_received', label: 'Offer Received' },
+  { value: 'visa_approved', label: 'Visa Approved' },
+  { value: 'visa_rejected', label: 'Visa Rejected' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'closed', label: 'Closed' },
+];
 
 interface StudentListPanelProps {
   students: Student[];
@@ -11,6 +24,8 @@ interface StudentListPanelProps {
   onLoadMore: () => void;
   search: string;
   onSearchChange: (value: string) => void;
+  milestone: StudentMilestoneFilter | '';
+  onMilestoneChange: (value: StudentMilestoneFilter | '') => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onEdit?: (student: Student) => void;
@@ -34,6 +49,8 @@ const StudentListPanel = ({
   onLoadMore,
   search,
   onSearchChange,
+  milestone,
+  onMilestoneChange,
   selectedId,
   onSelect,
   onEdit,
@@ -51,7 +68,7 @@ const StudentListPanel = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       <div className="shrink-0 space-y-3 border-b border-brand-100/70 p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-slate-800">Students</h2>
@@ -62,6 +79,18 @@ const StudentListPanel = ({
           )}
         </div>
         <SearchInput value={search} onChange={onSearchChange} placeholder="Search by name or email…" />
+        <Select
+          aria-label="Filter students"
+          value={milestone}
+          onChange={(e) => onMilestoneChange(e.target.value as StudentMilestoneFilter | '')}
+        >
+          <option value="">All students</option>
+          {MILESTONE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <div onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto p-3">

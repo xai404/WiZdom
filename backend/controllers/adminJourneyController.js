@@ -2,6 +2,12 @@ const asyncHandler = require('express-async-handler');
 const Student = require('../models/Student');
 const ApiError = require('../utils/ApiError');
 const { JOURNEY_STAGES } = require('../constants/journeyStages');
+
+// "rejected" is a terminal negative outcome that only makes sense on the
+// visa decision stage — it drives the "Visa Rejected" pipeline filter and
+// card outline. Every other stage only moves pending → in_progress →
+// completed.
+const REJECTABLE_STAGE = 'Visa Status Update';
 const { createNotification } = require('../utils/notify');
 const { resolveAccount } = require('../utils/resolveAccount');
 const { emitProgressUpdate } = require('../socket');
@@ -10,6 +16,10 @@ const STATUS_LABELS = {
   pending: 'Pending',
   in_progress: 'In Progress',
   completed: 'Completed',
+  // Terminal negative outcome (currently only meaningful on the "Visa
+  // Status Update" stage — drives the "Visa Rejected" pipeline filter and
+  // card outline on the admin side). Not counted toward journeyCompleted.
+  rejected: 'Rejected',
 };
 
 // @desc    Get a student's journey (same shape studentJourneyController
@@ -47,9 +57,15 @@ const updateStudentJourneyStage = asyncHandler(async (req, res) => {
   if (!status || !STATUS_LABELS[status]) {
     throw new ApiError(400, 'Invalid stage status');
   }
+  if (status === 'rejected' && title !== REJECTABLE_STAGE) {
+    throw new ApiError(400, `"Rejected" can only be set on the "${REJECTABLE_STAGE}" stage`);
+  }
 
-  const student = await Student.findById(req.params.id).select('name journey pushTokens updatedBy');
+  const student = await Student.findById(req.params.id).select('name status journey pushTokens updatedBy');
   if (!student) throw new ApiError(404, 'Student not found');
+  if (student.status === 'Closed') {
+    throw new ApiError(403, "This student's account is closed — reopen it before updating their journey");
+  }
 
   const updatedAt = new Date();
   const existing = student.journey.find((stage) => stage.title === title);
@@ -67,7 +83,11 @@ const updateStudentJourneyStage = asyncHandler(async (req, res) => {
   const savedByTitle = new Map(student.journey.map((stage) => [stage.title, stage]));
   student.journeyCompleted = JOURNEY_STAGES.every((t) => savedByTitle.get(t)?.status === 'completed');
 
-  await student.save();
+  // validateModifiedOnly: a stale/legacy value on an untouched enum path
+  // (e.g. a student whose `status` predates the narrowed Active/Inactive/
+  // Closed enum) must never block an otherwise-unrelated journey edit —
+  // same reasoning as studentsController.updateStudent.
+  await student.save({ validateModifiedOnly: true });
 
   await createNotification({
     student: student._id,
