@@ -14,6 +14,10 @@ export type AuthUser = {
   isActive?: boolean;
   createdAt?: string;
   phone?: string;
+  // Free-text batch/cohort label set by admin. When present it's the name
+  // shown in the app's chat header (a group/team thread) instead of the
+  // student's own name.
+  groupName?: string;
   gender?: string;
   countryInterested?: string[];
   intakeMonth?: number;

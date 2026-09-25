@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { JourneyHeroCard } from '@/components/journey-hero-card';
@@ -20,11 +20,6 @@ const GREEN = '#22c55e';
 // identically. All status/remark logic here is read straight from
 // useJourney()/STATUS_META, unchanged — this file only decides how to
 // *display* it.
-const EXTERNAL_STAGE_LINKS: Record<string, string> = {
-  'Career Counselling': 'https://psyx.cc',
-  'Country & Course Guidance': 'https://studyx.cc',
-  'Student Registration': 'https://docs.google.com/forms/d/e/1FAIpQLSecdJ7goBd1ugI7VSYadlFKbRe4wQqDyQFtpfHFTIyLlI_wmA/viewform',
-};
 
 type FilterKey = 'all' | JourneyStageStatus;
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -37,6 +32,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export function ProgressTimeline() {
   const { journey, loading, error, reload } = useJourney();
   const { isDark } = useAppTheme();
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const isInitialLoading = loading && !journey;
@@ -82,6 +78,29 @@ export function ProgressTimeline() {
         <Text className="mb-4 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Your Progress</Text>
 
         <JourneyHeroCard />
+
+        {/* Student Information Form entry point — always available from
+            Journey Tracking, reuses the existing /sif screen. */}
+        <Pressable
+          onPress={() => router.push('/sif' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Open your Student Information Form"
+          className="mb-4 flex-row items-center gap-3 rounded-2xl border border-brand-100 bg-white px-4 py-3.5 active:opacity-80 dark:border-slate-800 dark:bg-card-dark">
+          <View
+            style={{ width: 38, height: 38, borderRadius: 12 }}
+            className="items-center justify-center bg-brand-50 dark:bg-brand-950">
+            <Ionicons name="clipboard-outline" size={18} color={isDark ? '#8bb4fd' : PRIMARY} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[14.5px] font-semibold text-slate-900 dark:text-white">
+              Student Information Form
+            </Text>
+            <Text className="mt-0.5 text-[11.5px] text-slate-400 dark:text-slate-500">
+              Fill in your SIF — personal details, academics, LOR & SOP
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={isDark ? '#64748b' : '#94a3b8'} />
+        </Pressable>
 
         {journey && journey.length > 0 ? (
           <FilterPills active={filter} onChange={setFilter} isDark={isDark} />
@@ -183,8 +202,6 @@ function TimelineRow({
   const locked = stage.status === 'pending' && !isReached;
   const meta = STATUS_META[stage.status];
   const stageMeta = getStageMetaByTitle(stage.title);
-  const externalUrl = EXTERNAL_STAGE_LINKS[stage.title];
-  const canOpenPortal = !!externalUrl && !locked;
 
   const fade = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(14)).current;
@@ -220,10 +237,6 @@ function TimelineRow({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.status, index]);
-
-  const handleOpenPortal = () => {
-    if (canOpenPortal) Linking.openURL(externalUrl);
-  };
 
   const handleOpenChat = () => {
     if (locked) return;
@@ -309,7 +322,7 @@ function TimelineRow({
               shadowOffset: { width: 0, height: 3 },
               elevation: isDark ? 0 : 1,
             }}>
-            <Pressable disabled={!canOpenPortal} onPress={handleOpenPortal} className="flex-row items-center gap-3 px-3 py-3">
+            <View className="flex-row items-center gap-3 px-3 py-3">
               <View style={{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: iconTint.bg }}>
                 <Ionicons name={locked ? 'lock-closed-outline' : stageMeta.icon} size={17} color={iconTint.color} />
               </View>
@@ -340,14 +353,7 @@ function TimelineRow({
                   </Text>
                 ) : null}
               </View>
-            </Pressable>
-
-            {canOpenPortal ? (
-              <View className="flex-row items-center justify-end gap-1 px-3 pb-2">
-                <Text className="text-[11px] font-semibold text-brand-600 dark:text-brand-300">Open Portal</Text>
-                <Ionicons name="open-outline" size={12} color={isDark ? '#8bb4fd' : '#0049B7'} />
-              </View>
-            ) : null}
+            </View>
 
             {/* Remark preview lives inside the same card, right under the
                 header, separated only by a hairline divider — not a

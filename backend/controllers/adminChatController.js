@@ -11,6 +11,17 @@ const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatRead
 const { isDepartmentStaffed } = require('../utils/departments');
 const { emitChatMessage, emitChatMessageUpdated, emitChatThreadCleared } = require('../socket');
 
+// After a viewer's readBy is added to a batch of messages, re-broadcast just
+// the ones that actually changed so every open chat view (the student's app
+// and other staff) can turn the tick blue in real time via the existing
+// chat:message-updated event — no polling, no new event type.
+const broadcastReadStatus = async (messageIds, studentId) => {
+  if (!messageIds.length) return;
+  const participantIds = await getActiveParticipantIds(studentId);
+  const fresh = await Message.find({ _id: { $in: messageIds } });
+  attachReadStatus(fresh, participantIds, studentId).forEach((m) => emitChatMessageUpdated(m, studentId));
+};
+
 // Broadcasts an in-place change to an existing message (edit / soft-delete /
 // pin) to the student's room and every staff view, with read-status
 // attached so the tick colour doesn't flicker until the next poll.
@@ -37,6 +48,12 @@ const getStudentChat = asyncHandler(async (req, res) => {
   );
   if (!student) throw new ApiError(404, 'Student not found');
 
+  // Which messages this viewer hadn't read yet — captured before the update
+  // so we can push a real-time tick refresh for exactly those afterwards.
+  const newlyReadByViewer = (
+    await Message.find({ student: student._id, readBy: { $ne: req.user.id } }).select('_id')
+  ).map((m) => m._id);
+
   // Mark read BEFORE fetching — so this viewer's own readBy entry is
   // already reflected in the fullyRead status computed below, rather than
   // showing stale (missing their own just-now read) until their next poll.
@@ -52,6 +69,12 @@ const getStudentChat = asyncHandler(async (req, res) => {
 
   const participantIds = await getActiveParticipantIds(student._id);
   const withStatus = attachReadStatus(messages, participantIds, student._id);
+
+  // Real-time tick refresh for anyone else watching this thread — fire and
+  // forget so a socket hiccup never fails the read.
+  broadcastReadStatus(newlyReadByViewer, student._id).catch((err) =>
+    console.error(`[adminChatController] read-status broadcast student=${student._id} failed:`, err)
+  );
 
   // "Awaiting reply" for an UNTAGGED thread (nobody on the hook) clears as
   // soon as the first staff member opens it — this GET is that signal. A

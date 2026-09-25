@@ -105,8 +105,8 @@ const createStudent = asyncHandler(async (req, res) => {
     status,
   } = req.body;
 
-  if (!name || !email || !password) {
-    throw new ApiError(400, 'Name, email and password are required');
+  if (!name || !name.trim() || !email || !email.trim() || !phone || !phone.trim() || !password) {
+    throw new ApiError(400, 'Name, phone, email and password are required');
   }
   if (paymentStatus && !PAYMENT_STATUSES.includes(paymentStatus)) {
     throw new ApiError(400, 'Invalid payment status');

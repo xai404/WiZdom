@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Milestone, MessageCircle, ClipboardList } from 'lucide-react';
-import { Tabs } from '../ui';
+import { Avatar, Tabs } from '../ui';
 import type { TabItem } from '../ui';
 import { fetchStudentById, fetchStudentChat, fetchStudentJourney, postStudentChatMessage, updateStudentJourneyStage } from '../../api/students';
 import JourneyTab from './JourneyTab';
@@ -102,17 +102,38 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4">
-      <div className="flex shrink-0 items-center gap-2 overflow-x-auto">
-        <button onClick={onBack} className="shrink-0 text-slate-400 hover:text-slate-600">
-          <ArrowLeft size={20} />
-        </button>
-        <Tabs
-          tabs={TABS}
-          active={activeTab}
-          onChange={setActiveTab}
-          layoutId="student-detail-tab"
-          className="shrink-0"
-        />
+      <div className="flex shrink-0 flex-col gap-3">
+        <div className="flex items-center gap-2.5">
+          <button onClick={onBack} className="shrink-0 text-slate-400 hover:text-slate-600">
+            <ArrowLeft size={20} />
+          </button>
+          {/* Circular profile avatar beside the student's / group's name —
+              uses an existing profile image if set, initials otherwise. */}
+          <Avatar
+            name={student.groupName?.trim() || student.name}
+            src={student.profilePicture}
+            size={36}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {student.groupName?.trim() || student.name}
+            </p>
+            {student.groupName?.trim() ? (
+              <p className="truncate text-xs text-slate-400">{student.name}</p>
+            ) : (
+              <p className="truncate text-xs text-slate-400">{student.email}</p>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <Tabs
+            tabs={TABS}
+            active={activeTab}
+            onChange={setActiveTab}
+            layoutId="student-detail-tab"
+            className="shrink-0"
+          />
+        </div>
       </div>
 
       <div className="min-h-0 flex-1">

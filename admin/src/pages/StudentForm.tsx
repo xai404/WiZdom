@@ -106,8 +106,8 @@ const StudentForm = () => {
     e.preventDefault();
     setError('');
 
-    if (!form.name || !form.email) {
-      setError('Name and email are required.');
+    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+      setError('Name, phone and email are required.');
       return;
     }
     if (!isEdit && !form.password) {
@@ -177,9 +177,9 @@ const StudentForm = () => {
               {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="Full Name" icon={<User size={16} />} value={form.name} onChange={(e) => set('name', e.target.value)} />
-                <Input label="Email" type="email" icon={<Mail size={16} />} value={form.email} onChange={(e) => set('email', e.target.value)} />
-                <Input label="Phone" type="tel" icon={<Phone size={16} />} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                <Input label="Full Name *" icon={<User size={16} />} value={form.name} onChange={(e) => set('name', e.target.value)} required />
+                <Input label="Email *" type="email" icon={<Mail size={16} />} value={form.email} onChange={(e) => set('email', e.target.value)} required />
+                <Input label="Phone *" type="tel" icon={<Phone size={16} />} value={form.phone} onChange={(e) => set('phone', e.target.value)} required />
                 <Input
                   label="Group Name"
                   icon={<Users size={16} />}

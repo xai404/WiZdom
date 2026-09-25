@@ -74,6 +74,7 @@ export interface Student {
   name: string;
   email: string;
   phone?: string;
+  profilePicture?: string | null;
   gender?: string;
   countryInterested?: string[];
   intakeMonth?: number;

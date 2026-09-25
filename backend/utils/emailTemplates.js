@@ -10,28 +10,52 @@ const escapeHtml = (value) =>
     "'": '&#39;',
   }[char]));
 
+// Inline styles are the source of truth (many clients strip <style>), but a
+// small <style> block with a media query is layered on top so the layout
+// tightens up and the label/value rows stack on narrow phone screens.
 const emailShell = (title, bodyHtml) => `
 <!DOCTYPE html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body { margin:0; padding:0; width:100% !important; }
+      .wz-wrap { width:100%; }
+      .wz-card { width:100%; max-width:600px; }
+      img { border:0; line-height:100%; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+      @media only screen and (max-width:600px) {
+        .wz-outer-pad { padding:12px 0 !important; }
+        .wz-head-pad { padding:20px 20px !important; }
+        .wz-body-pad { padding:22px 20px !important; }
+        .wz-foot-pad { padding:16px 20px !important; }
+        .wz-stack { display:block !important; width:100% !important; padding:2px 0 !important; }
+        .wz-stack-label { color:#64748b !important; font-size:12px !important; }
+        .wz-stack-value { padding-bottom:10px !important; }
+      }
+    </style>
+  </head>
   <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:24px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="wz-wrap" style="background-color:#f1f5f9;">
       <tr>
-        <td align="center">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <td align="center" class="wz-outer-pad" style="padding:24px 12px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="wz-card" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             <tr>
-              <td style="background-color:#0f172a;padding:24px 32px;">
-                <h1 style="margin:0;font-size:20px;color:#ffffff;">WiZdom</h1>
-                <p style="margin:4px 0 0;font-size:13px;color:#94a3b8;">${escapeHtml(title)}</p>
+              <td class="wz-head-pad" style="background-color:#0f172a;padding:24px 32px;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;color:#ffffff;">WiZdom</h1>
+                <p style="margin:4px 0 0;font-size:13px;line-height:1.4;color:#94a3b8;">${escapeHtml(title)}</p>
               </td>
             </tr>
             <tr>
-              <td style="padding:32px;">
+              <td class="wz-body-pad" style="padding:32px;">
                 ${bodyHtml}
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:12px;color:#94a3b8;">This is an automated notification from WiZdom. Please do not reply to this email.</p>
+              <td class="wz-foot-pad" style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;">
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">This is an automated notification from WiZdom. Please do not reply to this email.</p>
               </td>
             </tr>
           </table>
@@ -42,16 +66,16 @@ const emailShell = (title, bodyHtml) => `
 </html>`;
 
 const sectionHeading = (label) =>
-  `<h2 style="margin:24px 0 12px;font-size:14px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #10b981;padding-bottom:6px;">${escapeHtml(label)}</h2>`;
+  `<h2 style="margin:24px 0 12px;font-size:14px;line-height:1.4;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #10b981;padding-bottom:6px;">${escapeHtml(label)}</h2>`;
 
 const detailRow = (label, value) => `
   <tr>
-    <td style="padding:6px 0;font-size:13px;color:#64748b;width:40%;">${escapeHtml(label)}</td>
-    <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(value ?? '—')}</td>
+    <td class="wz-stack wz-stack-label" style="padding:6px 12px 6px 0;font-size:13px;line-height:1.4;color:#64748b;width:38%;vertical-align:top;">${escapeHtml(label)}</td>
+    <td class="wz-stack wz-stack-value" style="padding:6px 0;font-size:14px;line-height:1.5;color:#0f172a;font-weight:600;word-break:break-word;">${escapeHtml(value ?? '—')}</td>
   </tr>`;
 
 const detailTable = (rows) => `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
     ${rows.join('')}
   </table>`;
 

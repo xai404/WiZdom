@@ -81,6 +81,7 @@ const normalize = (s: any): Student => ({
   name: s.name,
   email: s.email,
   phone: s.phone,
+  profilePicture: s.profilePicture ?? null,
   gender: s.gender,
   countryInterested: s.countryInterested,
   intakeMonth: s.intakeMonth,

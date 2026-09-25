@@ -31,6 +31,17 @@ const broadcastMessageUpdate = async (message, studentId) => {
   emitChatMessageUpdated(withStatus, studentId);
 };
 
+// After the student's readBy is added to a batch of admin messages,
+// re-broadcast just the ones that changed so the staff chat views can turn
+// the tick blue in real time — reuses the existing chat:message-updated
+// event, no polling.
+const broadcastReadStatus = async (messageIds, studentId) => {
+  if (!messageIds.length) return;
+  const participantIds = await getActiveParticipantIds(studentId);
+  const fresh = await Message.find({ _id: { $in: messageIds } });
+  attachReadStatus(fresh, participantIds, studentId).forEach((m) => emitChatMessageUpdated(m, studentId));
+};
+
 // @desc    Get the current student's single Group Chat thread
 // @route   GET /api/student/chat
 // @access  Private/Student
@@ -181,10 +192,21 @@ const postChatReply = asyncHandler(async (req, res) => {
 // @route   POST /api/student/chat/read
 // @access  Private/Student
 const markChatRead = asyncHandler(async (req, res) => {
+  // Admin messages the student hadn't read yet — captured before the update
+  // so we can push a real-time tick refresh for exactly those afterwards.
+  const newlyRead = (
+    await Message.find({ student: req.user.id, sender: 'admin', readBy: { $ne: req.user.id } }).select('_id')
+  ).map((m) => m._id);
+
   await Message.updateMany(
     { student: req.user.id, sender: 'admin' },
     { $set: { readByStudent: true }, $addToSet: { readBy: req.user.id } }
   );
+
+  broadcastReadStatus(newlyRead, req.user.id).catch((err) =>
+    console.error(`[studentChatController] read-status broadcast student=${req.user.id} failed:`, err)
+  );
+
   res.status(200).json({ success: true });
 });
 

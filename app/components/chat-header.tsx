@@ -34,6 +34,10 @@ export function ChatHeader({ searchOpen, searchQuery, onSearchChange, onToggleSe
   const { user } = useAuth();
   const { isDark } = useAppTheme();
 
+  // Group/team name when the student belongs to a cohort, otherwise their
+  // own name. Uses the existing groupName field — no fake default names.
+  const chatTitle = user?.groupName?.trim() || user?.name?.trim() || 'Student';
+
   const fade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -80,7 +84,7 @@ export function ChatHeader({ searchOpen, searchQuery, onSearchChange, onToggleSe
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.3)',
             }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#ffffff' }}>{getInitials(user?.name)}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#ffffff' }}>{getInitials(chatTitle)}</Text>
           </View>
 
           <View style={{ flex: 1, marginLeft: 4 }}>
@@ -95,7 +99,7 @@ export function ChatHeader({ searchOpen, searchQuery, onSearchChange, onToggleSe
               />
             ) : (
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#ffffff' }} numberOfLines={1}>
-                {user?.name?.trim() || 'Student'}
+                {chatTitle}
               </Text>
             )}
           </View>
