@@ -115,14 +115,14 @@ export function TravelHeroBanner({ quote }: TravelHeroBannerProps) {
         marginHorizontal: 20,
         marginTop: 12,
         borderRadius: 28,
-        shadowColor: '#001B47',
+        shadowColor: '#082414',
         shadowOpacity: 0.22,
         shadowRadius: 22,
         shadowOffset: { width: 0, height: 12 },
         elevation: 8,
       }}>
       <LinearGradient
-        colors={['#00132e', '#0049B7', '#3B82F6']}
+        colors={['#05190e', '#166534', '#2e8b57']}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.95, y: 1 }}
         style={{ height: quote ? 96 : 168, paddingHorizontal: 20, paddingTop: 18, borderRadius: 28, overflow: 'hidden' }}>

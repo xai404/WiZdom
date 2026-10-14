@@ -17,11 +17,11 @@ export function EmptyState({ icon, title, description }: EmptyStateProps) {
       <View
         className="mb-5 h-[84px] w-[84px] items-center justify-center rounded-[28px]"
         style={{
-          backgroundColor: isDark ? 'rgba(139,180,253,0.12)' : '#eef4ff',
+          backgroundColor: isDark ? 'rgba(134,201,155,0.12)' : '#eef7f1',
           borderWidth: 1,
-          borderColor: isDark ? 'rgba(139,180,253,0.18)' : '#dbe7ff',
+          borderColor: isDark ? 'rgba(134,201,155,0.18)' : '#d8eedf',
         }}>
-        <Ionicons name={icon} size={34} color={isDark ? '#8bb4fd' : '#0049B7'} />
+        <Ionicons name={icon} size={34} color={isDark ? '#86c99b' : '#166534'} />
       </View>
       <Text className="text-lg font-bold text-slate-900 dark:text-white">{title}</Text>
       <Text className="mt-2 text-center text-sm leading-relaxed text-slate-500 dark:text-slate-400">

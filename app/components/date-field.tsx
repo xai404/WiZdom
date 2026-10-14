@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-const PRIMARY = '#0049B7';
+const PRIMARY = '#166534';
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -100,7 +100,7 @@ export function DateField({
             className={`text-[14px] ${value ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
             {formatDisplay(value) || 'Select date'}
           </Text>
-          <Ionicons name="calendar-outline" size={16} color={isDark ? '#8bb4fd' : PRIMARY} />
+          <Ionicons name="calendar-outline" size={16} color={isDark ? '#86c99b' : PRIMARY} />
         </Pressable>
         {value ? (
           <Pressable

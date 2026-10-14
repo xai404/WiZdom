@@ -14,7 +14,7 @@
 },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#e8f5ec",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -39,9 +39,9 @@
           "image": "./assets/images/wizdom_logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#00132e",
+          "backgroundColor": "#05190e",
           "dark": {
-            "backgroundColor": "#00132e"
+            "backgroundColor": "#05190e"
           }
         }
       ],
@@ -49,7 +49,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/wizdom_logo.png",
-          "color": "#0049B7"
+          "color": "#166534"
         }
       ],
       [

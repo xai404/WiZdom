@@ -14,12 +14,11 @@ import { generateStrongPassword } from '../utils/generatePassword';
 // and every other screen that reads EMPLOYEE_DEPARTMENTS (Employees list
 // filter, ChatComposer's department tag picker) are unaffected.
 const DEPARTMENT_OPTIONS = [
-  { label: 'Editing', value: 'Editing' },
   { label: 'Application', value: 'Application' },
-  { label: 'Counselling', value: 'Counselling' },
+  { label: 'Editing', value: 'Editing' },
+  { label: 'Loan and Forex', value: 'Loan and Forex' },
   { label: 'Admin', value: 'Admin' },
   { label: 'Visa', value: 'Visa' },
-  { label: 'Finance', value: 'Finance' },
 ] as const;
 
 const ROLE_OPTIONS = [

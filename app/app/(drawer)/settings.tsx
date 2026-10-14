@@ -63,7 +63,7 @@ function SettingsRow({
         className="flex-row items-center justify-between rounded-2xl bg-card px-4 py-4 active:opacity-70 dark:bg-card-dark">
         <View className="flex-row items-center gap-3">
           <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
-            <Ionicons name={icon} size={18} color={isDark ? '#8bb4fd' : '#0049B7'} />
+            <Ionicons name={icon} size={18} color={isDark ? '#86c99b' : '#166534'} />
           </View>
           <Text className="text-[15px] font-medium text-slate-700 dark:text-slate-200">{label}</Text>
         </View>
@@ -98,7 +98,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={isDark}
                   onValueChange={handleToggleTheme}
-                  trackColor={{ false: '#e2e8f0', true: '#0049B7' }}
+                  trackColor={{ false: '#e2e8f0', true: '#166534' }}
                   thumbColor="#ffffff"
                 />
               </Animated.View>

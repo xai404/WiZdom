@@ -12,7 +12,7 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatRelativeShort } from '@/lib/format-date';
 import type { JourneyStage, JourneyStageStatus } from '@/lib/journey-api';
 
-const PRIMARY = '#0049B7';
+const PRIMARY = '#166534';
 const AMBER = '#eab308';
 const GREEN = '#22c55e';
 
@@ -73,7 +73,7 @@ export function ProgressTimeline() {
       contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
       className="px-5"
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#8bb4fd' : '#0049B7'} />}>
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#86c99b' : '#166534'} />}>
       <View className="w-full max-w-2xl self-center pt-3">
         <Text className="mb-4 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Your Progress</Text>
 
@@ -89,7 +89,7 @@ export function ProgressTimeline() {
           <View
             style={{ width: 38, height: 38, borderRadius: 12 }}
             className="items-center justify-center bg-brand-50 dark:bg-brand-950">
-            <Ionicons name="clipboard-outline" size={18} color={isDark ? '#8bb4fd' : PRIMARY} />
+            <Ionicons name="clipboard-outline" size={18} color={isDark ? '#86c99b' : PRIMARY} />
           </View>
           <View className="flex-1">
             <Text className="text-[14.5px] font-semibold text-slate-900 dark:text-white">
@@ -158,7 +158,7 @@ function FilterPills({ active, onChange, isDark }: { active: FilterKey; onChange
               justifyContent: 'center',
               paddingVertical: 8,
               borderRadius: 14,
-              backgroundColor: isActive ? (isDark ? '#1c2740' : '#ffffff') : 'transparent',
+              backgroundColor: isActive ? (isDark ? '#1a2e22' : '#ffffff') : 'transparent',
               shadowColor: '#0f172a',
               shadowOpacity: isActive && !isDark ? 0.08 : 0,
               shadowRadius: 6,
@@ -168,7 +168,7 @@ function FilterPills({ active, onChange, isDark }: { active: FilterKey; onChange
             <Text
               numberOfLines={1}
               className="text-[11.5px] font-semibold"
-              style={{ color: isActive ? (isDark ? '#8bb4fd' : PRIMARY) : isDark ? '#64748b' : '#94a3b8' }}>
+              style={{ color: isActive ? (isDark ? '#86c99b' : PRIMARY) : isDark ? '#64748b' : '#94a3b8' }}>
               {f.label}
             </Text>
           </Pressable>
@@ -253,7 +253,7 @@ function TimelineRow({
       ? { bg: isDark ? 'rgba(34,197,94,0.12)' : '#f0fdf4', color: GREEN }
       : stage.status === 'in_progress'
         ? { bg: isDark ? 'rgba(234,179,8,0.14)' : '#fefce8', color: AMBER }
-        : { bg: isDark ? '#111c33' : '#f8fafc', color: isDark ? '#94a3b8' : '#64748b' };
+        : { bg: isDark ? '#112019' : '#f8fafc', color: isDark ? '#94a3b8' : '#64748b' };
 
   const trackColor = isDark ? '#1e293b' : '#e2e8f0';
   const connectorAboveColor = prevCompleted ? GREEN : trackColor;
@@ -312,7 +312,7 @@ function TimelineRow({
             style={{
               borderRadius: 16,
               overflow: 'hidden',
-              backgroundColor: locked ? (isDark ? '#0b1220' : '#f8fafc') : isDark ? '#111c33' : '#ffffff',
+              backgroundColor: locked ? (isDark ? '#0a1410' : '#f8fafc') : isDark ? '#112019' : '#ffffff',
               borderWidth: 1,
               borderColor: locked ? (isDark ? '#1e293b' : '#e2e8f0') : stage.status === 'in_progress' ? (isDark ? 'rgba(234,179,8,0.35)' : '#fde68a') : stage.status === 'completed' ? (isDark ? 'rgba(34,197,94,0.25)' : '#bbf7d0') : isDark ? '#1e293b' : '#e2e8f0',
               opacity: locked ? 0.7 : 1,

@@ -22,7 +22,7 @@ export default function TabsLayout() {
   const { isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
 
-  const activeColor = isDark ? '#8bb4fd' : '#0049B7';
+  const activeColor = isDark ? '#86c99b' : '#166534';
   const inactiveColor = isDark ? '#64748b' : '#94a3b8';
   const barBottomPadding = Math.max(insets.bottom, 10);
 
@@ -91,7 +91,7 @@ export default function TabsLayout() {
           tabBarActiveTintColor: activeColor,
           tabBarInactiveTintColor: inactiveColor,
           tabBarStyle: {
-            backgroundColor: isDark ? '#0b1220' : '#ffffff',
+            backgroundColor: isDark ? '#0a1410' : '#ffffff',
             borderTopWidth: isDark ? 0 : 1,
             borderTopColor: '#eef2f7',
             height: 70 + barBottomPadding,

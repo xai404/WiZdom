@@ -9,8 +9,8 @@ import confettiAnimation from '@/assets/lottie/confetti-burst.json';
 import { useAuth } from '@/context/auth-context';
 import { useJourney } from '@/context/journey-context';
 
-const PRIMARY = '#0049B7';
-const ACCENT = '#3B82F6';
+const PRIMARY = '#166534';
+const ACCENT = '#2e8b57';
 const GOLD = '#f59e0b';
 
 // Fires once per student, the first time every journey stage reaches
@@ -77,7 +77,7 @@ export function JourneyCelebrationModal() {
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(3,10,26,0.72)', opacity: bgOpacity }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,14,8,0.72)', opacity: bgOpacity }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
 
         {visible ? (
@@ -102,7 +102,7 @@ export function JourneyCelebrationModal() {
               elevation: 14,
             }}>
             <LinearGradient
-              colors={['#001233', PRIMARY, ACCENT]}
+              colors={['#05190e', PRIMARY, ACCENT]}
               start={{ x: 0.1, y: 0 }}
               end={{ x: 0.9, y: 1 }}
               style={{ paddingTop: 40, paddingBottom: 28, paddingHorizontal: 26, alignItems: 'center' }}>
@@ -140,7 +140,7 @@ export function JourneyCelebrationModal() {
                   fontWeight: '700',
                   letterSpacing: 2.2,
                   textTransform: 'uppercase',
-                  color: '#bfd6ff',
+                  color: '#b5dcc1',
                   marginBottom: 8,
                 }}>
                 Journey Complete

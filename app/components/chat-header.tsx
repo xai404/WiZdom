@@ -8,8 +8,8 @@ import { CallButton } from '@/components/call-button';
 import { useAuth } from '@/context/auth-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-const PRIMARY = '#0049B7';
-const ACCENT = '#3B82F6';
+const PRIMARY = '#166534';
+const ACCENT = '#2e8b57';
 
 function getInitials(name?: string) {
   if (!name) return 'S';
@@ -48,7 +48,7 @@ export function ChatHeader({ searchOpen, searchQuery, onSearchChange, onToggleSe
   return (
     <Animated.View style={{ opacity: fade }}>
       <LinearGradient
-        colors={isDark ? ['#00132e', '#0B1E45', PRIMARY] : ['#00132e', PRIMARY, ACCENT]}
+        colors={isDark ? ['#05190e', '#0b2e1b', PRIMARY] : ['#05190e', PRIMARY, ACCENT]}
         start={{ x: 0.05, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
@@ -57,7 +57,7 @@ export function ChatHeader({ searchOpen, searchQuery, onSearchChange, onToggleSe
           paddingHorizontal: 14,
           borderBottomLeftRadius: 24,
           borderBottomRightRadius: 24,
-          shadowColor: '#0049B7',
+          shadowColor: '#166534',
           shadowOpacity: 0.3,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 8 },

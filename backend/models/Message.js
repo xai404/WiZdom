@@ -33,7 +33,7 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
-    // Student-facing label for who sent this ("Admin", "Counselling",
+    // Student-facing label for who sent this ("Admin", "Visa",
     // "Editing"...) — set only for sender:'admin' messages. The Student App
     // shows this instead of senderName, so an individual staff member's
     // personal name is never exposed to a student; the Admin Panel's own

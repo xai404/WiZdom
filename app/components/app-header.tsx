@@ -9,8 +9,8 @@ import { useNotifications } from '@/context/notifications-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatFullDate } from '@/lib/format-date';
 
-const PRIMARY = '#0049B7';
-const ACCENT = '#3B82F6';
+const PRIMARY = '#166534';
+const ACCENT = '#2e8b57';
 
 function getInitials(name?: string) {
   if (!name) return 'S';
@@ -34,7 +34,7 @@ export function AppHeader() {
 
   return (
     <LinearGradient
-      colors={isDark ? ['#00132e', '#0B1E45', PRIMARY] : ['#00132e', PRIMARY, ACCENT]}
+      colors={isDark ? ['#05190e', '#0b2e1b', PRIMARY] : ['#05190e', PRIMARY, ACCENT]}
       start={{ x: 0.05, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
@@ -43,7 +43,7 @@ export function AppHeader() {
         paddingHorizontal: 16,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
-        shadowColor: '#001B47',
+        shadowColor: '#082414',
         shadowOpacity: 0.26,
         shadowRadius: 24,
         shadowOffset: { width: 0, height: 12 },
@@ -66,7 +66,7 @@ export function AppHeader() {
             accessibilityRole="button"
             accessibilityLabel="Toggle dark mode"
             className="h-11 w-11 items-center justify-center rounded-full active:bg-white/10">
-            <Ionicons name={isDark ? 'moon' : 'sunny'} size={20} color={isDark ? '#c7d8ff' : '#ffd166'} />
+            <Ionicons name={isDark ? 'moon' : 'sunny'} size={20} color={isDark ? '#c4e3cd' : '#ffd166'} />
           </Pressable>
 
           <CallButton color="#ffffff" />
@@ -89,7 +89,7 @@ export function AppHeader() {
                   borderRadius: 5,
                   backgroundColor: '#f87171',
                   borderWidth: 2,
-                  borderColor: '#00132e',
+                  borderColor: '#05190e',
                 }}
               />
             ) : null}

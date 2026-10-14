@@ -4,6 +4,6 @@
 // GET /api/student/departments resolves (see lib/departments-api.ts), but
 // falls back to showing every team if that request hasn't landed yet
 // (e.g. the backend route isn't deployed) rather than showing nothing.
-export const DEPARTMENTS = ['Editing', 'Application', 'Counselling', 'Admin', 'Visa', 'Finance'] as const;
+export const DEPARTMENTS = ['Application', 'Editing', 'Loan and Forex', 'Admin', 'Visa'] as const;
 
 export type Department = (typeof DEPARTMENTS)[number];

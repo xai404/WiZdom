@@ -34,7 +34,7 @@ function getInitials(name?: string) {
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Active: { bg: '#dcfce7', text: '#16a34a' },
   Inactive: { bg: '#f1f5f9', text: '#64748b' },
-  Converted: { bg: '#dbeafe', text: '#1d4ed8' },
+  Converted: { bg: '#dcf2e3', text: '#15803d' },
   Lead: { bg: '#fef9c3', text: '#a16207' },
   'Follow Up': { bg: '#ede9fe', text: '#6d28d9' },
   Closed: { bg: '#fee2e2', text: '#b91c1c' },
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
             />
           ) : (
             <LinearGradient
-              colors={['#3B82F6', '#0049B7']}
+              colors={['#2e8b57', '#166534']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -105,7 +105,7 @@ export default function ProfileScreen() {
                 borderRadius: 48,
                 alignItems: 'center',
                 justifyContent: 'center',
-                shadowColor: '#0049B7',
+                shadowColor: '#166534',
                 shadowOpacity: 0.35,
                 shadowRadius: 16,
                 shadowOffset: { width: 0, height: 8 },
@@ -131,7 +131,7 @@ export default function ProfileScreen() {
               <Divider />
               <View className="flex-row items-center gap-3 px-4 py-3.5">
                 <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
-                  <Ionicons name="calendar-outline" size={17} color={isDark ? '#8bb4fd' : '#0049B7'} />
+                  <Ionicons name="calendar-outline" size={17} color={isDark ? '#86c99b' : '#166534'} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs text-slate-400 dark:text-slate-500">Joined</Text>
@@ -152,8 +152,8 @@ export default function ProfileScreen() {
               onPress={openResetModal}
               icon="key-outline"
               label="Reset Password"
-              color={isDark ? '#8bb4fd' : '#0049B7'}
-              backgroundColor={isDark ? 'rgba(139,180,253,0.1)' : '#eef2ff'}
+              color={isDark ? '#86c99b' : '#166534'}
+              backgroundColor={isDark ? 'rgba(134,201,155,0.1)' : '#eef2ff'}
               style={{ marginTop: 20 }}
             />
 
@@ -195,7 +195,7 @@ function ResetPasswordModal({
   onDone: () => void;
 }) {
   const { isDark } = useAppTheme();
-  const accent = isDark ? '#8bb4fd' : '#0049B7';
+  const accent = isDark ? '#86c99b' : '#166534';
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -211,7 +211,7 @@ function ResetPasswordModal({
 
   return (
     <Modal visible={!!state} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(3,10,26,0.55)' }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,14,8,0.55)' }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={state?.step === 'confirm' || state?.step === 'error' ? onCancel : undefined} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <View
@@ -364,7 +364,7 @@ function DetailRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMa
   return (
     <View className="flex-row items-center gap-3 px-4 py-3.5">
       <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
-        <Ionicons name={icon} size={17} color={isDark ? '#8bb4fd' : '#0049B7'} />
+        <Ionicons name={icon} size={17} color={isDark ? '#86c99b' : '#166534'} />
       </View>
       <View className="flex-1">
         <Text className="text-xs text-slate-400 dark:text-slate-500">{label}</Text>

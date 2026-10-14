@@ -38,7 +38,7 @@ const quickActions = [
   },
 ];
 
-const CHART_COLORS = ['#0049B7', '#3B82F6', '#5f97fa', '#8bb4fd', '#003a92', '#b9d2ff'];
+const CHART_COLORS = ['#166534', '#2e8b57', '#4caf6e', '#86c99b', '#14532d', '#a9d8b8'];
 const SuperAdminDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -157,7 +157,7 @@ const SuperAdminDashboard = () => {
       <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Employees by Team */}
         <div className="relative overflow-hidden rounded-2xl border border-brand-100 bg-white p-6 shadow-sm">
-          <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-linear-to-br from-brand-100 to-blue-100 blur-3xl" />
+          <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-linear-to-br from-brand-100 to-brand-50 blur-3xl" />
           <h2 className="relative mb-4 text-base font-semibold text-slate-900">Employees by Team</h2>
           {loading ? (
             <p className="relative text-sm text-slate-400">Loading…</p>

@@ -7,7 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { useJourney } from '@/context/journey-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-const PRIMARY = '#0049B7';
+const PRIMARY = '#166534';
 const GOLD = '#f59e0b';
 const TOTAL_FEE_STARS = 4;
 
@@ -77,7 +77,7 @@ export function JourneyHeroCard() {
       className="mb-4 rounded-3xl px-5 py-5 dark:bg-card-dark"
       style={{
         backgroundColor: isDark ? undefined : '#ffffff',
-        shadowColor: '#0B2A66',
+        shadowColor: '#0e3d22',
         shadowOpacity: isDark ? 0 : 0.1,
         shadowRadius: 24,
         shadowOffset: { width: 0, height: 10 },
@@ -90,7 +90,7 @@ export function JourneyHeroCard() {
           </Text>
           <FeeStars paymentStatus={user?.paymentStatus} isDark={isDark} />
           <View className="mt-1 flex-row items-baseline gap-1.5">
-            <Text className="text-3xl font-extrabold" style={{ color: isDark ? '#8bb4fd' : PRIMARY }}>
+            <Text className="text-3xl font-extrabold" style={{ color: isDark ? '#86c99b' : PRIMARY }}>
               {Math.round(fraction * 100)}%
             </Text>
             <Text className="text-sm font-semibold text-slate-400 dark:text-slate-500">Completed</Text>
@@ -110,10 +110,10 @@ export function JourneyHeroCard() {
         </View>
       </View>
 
-      <View className="mt-4" style={{ height: 10, borderRadius: 999, backgroundColor: isDark ? '#1c2740' : '#eef2f7', overflow: 'hidden' }}>
+      <View className="mt-4" style={{ height: 10, borderRadius: 999, backgroundColor: isDark ? '#1a2e22' : '#eef2f7', overflow: 'hidden' }}>
         <Animated.View style={{ height: '100%', width: widthPct, borderRadius: 999, overflow: 'hidden' }}>
           <LinearGradient
-            colors={isDark ? ['#5f97fa', '#8bb4fd'] : ['#0049B7', '#3B82F6']}
+            colors={isDark ? ['#4caf6e', '#86c99b'] : ['#166534', '#2e8b57']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ flex: 1 }}
@@ -124,7 +124,7 @@ export function JourneyHeroCard() {
       <Text className="mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
         {completed} of {total} stages completed{remaining > 0 ? ` • Only ${remaining} step${remaining === 1 ? '' : 's'} left` : ''}
       </Text>
-      <Text className="mt-1.5 text-[13px] font-bold" style={{ color: isDark ? '#8bb4fd' : PRIMARY }}>
+      <Text className="mt-1.5 text-[13px] font-bold" style={{ color: isDark ? '#86c99b' : PRIMARY }}>
         {motivationalLine(fraction, remaining)}
       </Text>
     </View>

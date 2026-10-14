@@ -40,7 +40,7 @@ import {
   type SopDetails,
 } from '@/lib/sif-api';
 
-const PRIMARY = '#0049B7';
+const PRIMARY = '#166534';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -194,7 +194,7 @@ function Collapsible({
         onPress={onToggle}
         className="flex-row items-center gap-3 px-3.5 py-3 active:bg-slate-50 dark:active:bg-slate-800/40">
         <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-950">
-          <Ionicons name={icon} size={17} color={isDark ? '#8bb4fd' : PRIMARY} />
+          <Ionicons name={icon} size={17} color={isDark ? '#86c99b' : PRIMARY} />
         </View>
         <View className="flex-1">
           <Text className="text-[14px] font-bold text-slate-900 dark:text-white">{title}</Text>
@@ -452,7 +452,7 @@ export default function SifScreen() {
             ) : null}
 
             <View className="mb-4 flex-row gap-2.5 rounded-2xl bg-brand-50 px-3.5 py-3 dark:bg-brand-950/50">
-              <Ionicons name="information-circle-outline" size={16} color={isDark ? '#8bb4fd' : PRIMARY} />
+              <Ionicons name="information-circle-outline" size={16} color={isDark ? '#86c99b' : PRIMARY} />
               <Text className="flex-1 text-[12px] leading-4 text-brand-700 dark:text-brand-200">
                 Tap a section to fill it in. You do not need to write the LOR or SOP yourself — brief points are
                 enough.
@@ -680,7 +680,7 @@ export default function SifScreen() {
               <Pressable
                 onPress={addInternship}
                 className="flex-row items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-300 py-2.5 active:bg-brand-50 dark:border-slate-700 dark:active:bg-slate-800">
-                <Ionicons name="add" size={16} color={isDark ? '#8bb4fd' : PRIMARY} />
+                <Ionicons name="add" size={16} color={isDark ? '#86c99b' : PRIMARY} />
                 <Text className="text-[13px] font-semibold text-brand-600 dark:text-brand-300">Add another experience</Text>
               </Pressable>
             </Collapsible>
@@ -765,7 +765,7 @@ export default function SifScreen() {
               <Pressable
                 onPress={addRecommender}
                 className="flex-row items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-300 py-2.5 active:bg-brand-50 dark:border-slate-700 dark:active:bg-slate-800">
-                <Ionicons name="add" size={16} color={isDark ? '#8bb4fd' : PRIMARY} />
+                <Ionicons name="add" size={16} color={isDark ? '#86c99b' : PRIMARY} />
                 <Text className="text-[13px] font-semibold text-brand-600 dark:text-brand-300">Add another recommender</Text>
               </Pressable>
             </Collapsible>

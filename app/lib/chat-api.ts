@@ -6,7 +6,7 @@ export type ChatMessage = {
   _id: string;
   sender: MessageSender;
   senderName: string;
-  // Student-facing label ("Admin", "Counselling", "Editing"...) for
+  // Student-facing label ("Admin", "Visa", "Editing"...) for
   // sender:'admin' messages — shown instead of senderName so an individual
   // staff member's personal name is never surfaced in the app.
   senderRole: string | null;

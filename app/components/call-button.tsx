@@ -80,13 +80,13 @@ export function CallButton({ color, size = 44 }: { color?: string; size?: number
             width: size * 0.23,
             height: size * 0.23,
             borderRadius: size * 0.12,
-            backgroundColor: color ?? '#0049B7',
+            backgroundColor: color ?? '#166534',
             opacity: ringOpacity,
             transform: [{ scale: ringScale }],
           }}
         />
         <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name="call" size={size * 0.48} color={color ?? (isDark ? '#8bb4fd' : '#0049B7')} />
+          <Ionicons name="call" size={size * 0.48} color={color ?? (isDark ? '#86c99b' : '#166534')} />
         </Animated.View>
       </Pressable>
 
@@ -104,7 +104,7 @@ export function CallButton({ color, size = 44 }: { color?: string; size?: number
 
             {!contacts && !loadError ? (
               <View className="items-center py-6">
-                <ActivityIndicator size="small" color={isDark ? '#8bb4fd' : '#0049B7'} />
+                <ActivityIndicator size="small" color={isDark ? '#86c99b' : '#166534'} />
               </View>
             ) : loadError ? (
               <Text className="mb-2 text-center text-sm text-slate-500 dark:text-slate-400">{loadError}</Text>
@@ -119,7 +119,7 @@ export function CallButton({ color, size = 44 }: { color?: string; size?: number
                   onPress={() => handleCall(contact)}
                   className="mb-2 flex-row items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 active:opacity-70 dark:bg-slate-900/40">
                   <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-800">
-                    <Ionicons name="call-outline" size={18} color={isDark ? '#8bb4fd' : '#0049B7'} />
+                    <Ionicons name="call-outline" size={18} color={isDark ? '#86c99b' : '#166534'} />
                   </View>
                   <View className="flex-1">
                     <Text className="text-[15px] font-semibold text-slate-800 dark:text-white">{contact.label}</Text>

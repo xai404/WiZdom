@@ -82,7 +82,7 @@ const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
           <div
             className={clsx(
               'relative rounded-2xl border px-4 py-2.5 text-slate-700 transition-shadow',
-              isSelf ? 'border-sky-100 bg-sky-50' : 'border-slate-200 bg-slate-50',
+              isSelf ? 'border-brand-100 bg-brand-50' : 'border-slate-200 bg-slate-50',
               highlighted && 'ring-2 ring-offset-2 ring-brand-400',
               message.pinned && !highlighted && 'ring-1 ring-amber-400'
             )}
@@ -171,7 +171,7 @@ const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
               {isSelf &&
                 !message.deleted &&
                 (message.fullyRead ? (
-                  <CheckCheck size={12} className="text-sky-500" />
+                  <CheckCheck size={12} className="text-brand-500" />
                 ) : (
                   <Check size={12} />
                 ))}

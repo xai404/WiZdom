@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text } from 'react-native';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const PRIMARY = '#0049B7';
-const ACCENT = '#3B82F6';
+const PRIMARY = '#166534';
+const ACCENT = '#2e8b57';
 const GOLD = '#f59e0b';
 const VISIBLE_DURATION = 2400;
 
@@ -16,16 +16,16 @@ const VISIBLE_DURATION = 2400;
 const SPARKS = [
   { angle: -90, dist: 96, size: 9, color: GOLD, delay: 0 },
   { angle: -60, dist: 72, size: 6, color: '#ffffff', delay: 40 },
-  { angle: -30, dist: 104, size: 8, color: '#8bb4fd', delay: 90 },
+  { angle: -30, dist: 104, size: 8, color: '#86c99b', delay: 90 },
   { angle: 0, dist: 80, size: 6, color: GOLD, delay: 30 },
   { angle: 30, dist: 100, size: 9, color: '#ffffff', delay: 70 },
-  { angle: 60, dist: 70, size: 6, color: '#8bb4fd', delay: 20 },
+  { angle: 60, dist: 70, size: 6, color: '#86c99b', delay: 20 },
   { angle: 90, dist: 92, size: 8, color: GOLD, delay: 60 },
   { angle: 120, dist: 74, size: 6, color: '#ffffff', delay: 100 },
-  { angle: 150, dist: 102, size: 9, color: '#8bb4fd', delay: 45 },
+  { angle: 150, dist: 102, size: 9, color: '#86c99b', delay: 45 },
   { angle: 180, dist: 78, size: 6, color: GOLD, delay: 15 },
   { angle: 210, dist: 98, size: 8, color: '#ffffff', delay: 85 },
-  { angle: 240, dist: 72, size: 6, color: '#8bb4fd', delay: 55 },
+  { angle: 240, dist: 72, size: 6, color: '#86c99b', delay: 55 },
 ] as const;
 
 type GreetingOverlayProps = {
@@ -48,7 +48,7 @@ function greetingFor(date: Date) {
   if (h >= 17 && h < 21) {
     return { line: 'Good Evening', emoji: '🌆', sub: "Winding down — let's check your progress.", halo: 'rgba(249,115,22,0.5)' };
   }
-  return { line: 'Good Night', emoji: '🌙', sub: "Late one tonight? We're right here with you.", halo: 'rgba(139,180,253,0.5)' };
+  return { line: 'Good Night', emoji: '🌙', sub: "Late one tonight? We're right here with you.", halo: 'rgba(134,201,155,0.5)' };
 }
 
 function Spark({ angle, dist, size, color, delay, burst }: (typeof SPARKS)[number] & { burst: Animated.Value }) {
@@ -174,7 +174,7 @@ export function GreetingOverlay({ name, visible, onDone }: GreetingOverlayProps)
 
       <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
         <LinearGradient
-          colors={['#001a44', PRIMARY, ACCENT]}
+          colors={['#082414', PRIMARY, ACCENT]}
           start={{ x: 0.05, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{

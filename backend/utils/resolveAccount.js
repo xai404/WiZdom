@@ -8,7 +8,7 @@ const Employee = require('../models/Employee');
 // (Student.createdBy/updatedBy) and the Admin Panel's own chat view, where
 // staff accountability matters.
 //
-// `displayRole` is a student-facing label (e.g. "Counselling", "Editing",
+// `displayRole` is a student-facing label (e.g. "Visa", "Editing",
 // "Admin") — used when stamping a chat message's senderRole, so the
 // Student App can show "who" sent a message without exposing an
 // individual staff member's personal name.

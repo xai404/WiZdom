@@ -10,6 +10,7 @@
     "seed:admin": "node utils/seedAdmin.js",
     "migrate:phase1": "node utils/migratePhase1EmployeeStudent.js",
     "migrate:phase2-counsellor": "node utils/migratePhase2CounsellorName.js",
+    "migrate:departments-v2": "node utils/migrateDepartmentsV2.js",
     "backfill:last-message-at": "node scripts/backfillLastMessageAt.js"
   },
   "dependencies": {

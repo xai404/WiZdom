@@ -74,7 +74,7 @@ function Particle({ left, top, size, delay, float }: (typeof PARTICLES)[number])
         width: size,
         height: size,
         borderRadius: size,
-        backgroundColor: '#bfd6ff',
+        backgroundColor: '#b5dcc1',
         opacity: twinkle,
         transform: [{ translateY }],
       }}
@@ -169,9 +169,9 @@ export default function SplashScreen() {
   }, [minTimeElapsed, authLoading, user, token, router]);
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgOpacity, backgroundColor: '#00050f' }]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgOpacity, backgroundColor: '#020a05' }]}>
       <LinearGradient
-        colors={['#00050f', '#00132e', '#001f4d', '#0049B7']}
+        colors={['#020a05', '#05190e', '#0a2e1a', '#166534']}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.85, y: 1 }}
         style={StyleSheet.absoluteFill}

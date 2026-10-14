@@ -32,20 +32,20 @@ export function PlaceholderScreen({ title, icon, description }: PlaceholderScree
           <View
             className="mb-5 h-20 w-20 items-center justify-center rounded-3xl bg-brand-50 dark:bg-card-dark"
             style={{
-              shadowColor: '#0049B7',
+              shadowColor: '#166534',
               shadowOpacity: isDark ? 0 : 0.12,
               shadowRadius: 16,
               shadowOffset: { width: 0, height: 8 },
               elevation: isDark ? 0 : 2,
             }}>
-            <Ionicons name={icon} size={32} color={isDark ? '#8bb4fd' : '#0049B7'} />
+            <Ionicons name={icon} size={32} color={isDark ? '#86c99b' : '#166534'} />
           </View>
           <Text className="text-xl font-bold text-slate-900 dark:text-white">{title}</Text>
           <Text className="mt-2 max-w-xs text-center text-sm leading-relaxed text-slate-500 dark:text-slate-400">
             {description}
           </Text>
           <View className="mt-5 flex-row items-center gap-1.5 rounded-full bg-brand-50 px-3.5 py-1.5 dark:bg-card-dark">
-            <Ionicons name="sparkles-outline" size={13} color={isDark ? '#8bb4fd' : '#0049B7'} />
+            <Ionicons name="sparkles-outline" size={13} color={isDark ? '#86c99b' : '#166534'} />
             <Text className="text-xs font-semibold text-brand-600 dark:text-brand-300">Coming soon</Text>
           </View>
         </Animated.View>

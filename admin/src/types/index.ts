@@ -26,7 +26,7 @@ export interface DashboardStats {
   waitingStudents?: WaitingStudent[];
 }
 
-export const EMPLOYEE_DEPARTMENTS = ['Editing', 'Application', 'Counselling', 'Admin', 'Visa', 'Finance'] as const;
+export const EMPLOYEE_DEPARTMENTS = ['Application', 'Editing', 'Loan and Forex', 'Admin', 'Visa'] as const;
 export type EmployeeDepartment = (typeof EMPLOYEE_DEPARTMENTS)[number];
 
 export type EmployeeRole = 'admin' | 'manager' | 'staff' | 'co_admin';

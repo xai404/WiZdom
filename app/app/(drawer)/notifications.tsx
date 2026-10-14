@@ -22,13 +22,13 @@ const DEFAULT_META_DARK = { bg: '#1e293b', color: '#94a3b8' };
 // than crashing the screen — the API response is out of this file's
 // control and notification types can grow independently of the app build.
 const TYPE_META: Partial<Record<NotificationType, { icon: keyof typeof Ionicons.glyphMap; bg: string; color: string }>> = {
-  stage_status: { icon: 'flag-outline', bg: '#eef5ff', color: '#0049B7' },
+  stage_status: { icon: 'flag-outline', bg: '#ecf7ef', color: '#166534' },
   remark: { icon: 'chatbubble-ellipses-outline', bg: '#ffedd5', color: '#c2410c' },
   message: { icon: 'mail-outline', bg: '#dcfce7', color: '#16a34a' },
 };
 
 const TYPE_META_DARK: Partial<Record<NotificationType, { bg: string; color: string }>> = {
-  stage_status: { bg: '#0f1f3d', color: '#8bb4fd' },
+  stage_status: { bg: '#0f2a1b', color: '#86c99b' },
   remark: { bg: '#2a1608', color: '#fb923c' },
   message: { bg: '#0f2417', color: '#4ade80' },
 };
@@ -89,7 +89,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           className="px-5"
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#8bb4fd' : '#0049B7'} />}>
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#86c99b' : '#166534'} />}>
           <View className="pt-2">
             {notifications?.map((notification, index) => (
               <NotificationRow
@@ -150,9 +150,9 @@ function NotificationRow({
         onPressOut={pressOut}
         className="mb-2.5 flex-row items-start gap-3 rounded-2xl px-4 py-3.5"
         style={{
-          backgroundColor: notification.read ? 'transparent' : isDark ? 'rgba(139,180,253,0.06)' : '#f5f8ff',
+          backgroundColor: notification.read ? 'transparent' : isDark ? 'rgba(134,201,155,0.06)' : '#f4faf6',
           borderLeftWidth: 3,
-          borderLeftColor: notification.read ? 'transparent' : isDark ? '#8bb4fd' : '#0049B7',
+          borderLeftColor: notification.read ? 'transparent' : isDark ? '#86c99b' : '#166534',
         }}>
         <View
           className="h-9 w-9 items-center justify-center rounded-full"

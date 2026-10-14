@@ -29,13 +29,13 @@ export default function CoursesScreen() {
         <View
           className="mb-5 h-20 w-20 items-center justify-center rounded-3xl bg-brand-50 dark:bg-card-dark"
           style={{
-            shadowColor: '#0049B7',
+            shadowColor: '#166534',
             shadowOpacity: isDark ? 0 : 0.12,
             shadowRadius: 16,
             shadowOffset: { width: 0, height: 8 },
             elevation: isDark ? 0 : 2,
           }}>
-          <Ionicons name="school-outline" size={32} color={isDark ? '#8bb4fd' : '#0049B7'} />
+          <Ionicons name="school-outline" size={32} color={isDark ? '#86c99b' : '#166534'} />
         </View>
         <Text className="text-xl font-bold text-slate-900 dark:text-white">University Courses</Text>
         <Text className="mt-2 max-w-xs text-center text-sm leading-relaxed text-slate-500 dark:text-slate-400">
