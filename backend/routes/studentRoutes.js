@@ -15,7 +15,7 @@ const {
   markAllNotificationsRead,
 } = require('../controllers/studentNotificationController');
 const { registerPushToken } = require('../controllers/studentPushController');
-const { resetMyPassword } = require('../controllers/studentAccountController');
+const { resetMyPassword, changeMyPassword } = require('../controllers/studentAccountController');
 const { getMySif, updateMySif } = require('../controllers/studentSifController');
 const { getHelplineContact, getSupportContacts } = require('../controllers/supportContactsController');
 const { protect, requireRole } = require('../middleware/authMiddleware');
@@ -51,6 +51,7 @@ router.post('/notifications/read-all', protect, requireRole('student'), markAllN
 router.post('/push-token', protect, requireRole('student'), registerPushToken);
 
 router.post('/reset-password', protect, requireRole('student'), resetMyPassword);
+router.post('/change-password', protect, requireRole('student'), changeMyPassword);
 
 // Student Information Form — the student's own LOR/SOP intake notes.
 router.get('/sif', protect, requireRole('student'), getMySif);

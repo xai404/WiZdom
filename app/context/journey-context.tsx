@@ -2,7 +2,13 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { useAuth } from '@/context/auth-context';
-import { fetchMyJourney, type JourneyStage, type JourneyStageStatus } from '@/lib/journey-api';
+import {
+  fetchMyJourney,
+  type JourneyRemark,
+  type JourneyStage,
+  type JourneyStageStatus,
+  type JourneySubstep,
+} from '@/lib/journey-api';
 import { connectSocket } from '@/lib/socket';
 
 // Read-only for the Student App by design — stage status and remarks are
@@ -67,6 +73,10 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       title: string;
       status: JourneyStageStatus;
       updatedAt: string;
+      // Present only when the stage's remarks were changed by staff.
+      latestRemark?: string | null;
+      remarks?: JourneyRemark[];
+      substeps?: JourneySubstep[];
     }) => {
       // Belt-and-suspenders: the backend already scopes this event to the
       // student's own room, but only act on it if it's actually for the
@@ -85,7 +95,16 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         }
 
         const next = prev.map((stage) =>
-          stage.title === payload.title ? { ...stage, status: payload.status, updatedAt: payload.updatedAt } : stage
+          stage.title === payload.title
+            ? {
+                ...stage,
+                status: payload.status,
+                updatedAt: payload.updatedAt,
+                ...(payload.latestRemark !== undefined ? { latestRemark: payload.latestRemark } : {}),
+                ...(payload.remarks !== undefined ? { remarks: payload.remarks } : {}),
+                ...(payload.substeps !== undefined ? { substeps: payload.substeps } : {}),
+              }
+            : stage
         );
 
         return next;

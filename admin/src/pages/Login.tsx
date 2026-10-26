@@ -60,7 +60,7 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <Input
-            label="Email"
+            label="Email *"
             id="email"
             type="email"
             autoComplete="email"
@@ -70,7 +70,7 @@ const Login = () => {
           />
 
           <Input
-            label="Password"
+            label="Password *"
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"

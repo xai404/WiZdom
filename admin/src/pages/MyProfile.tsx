@@ -65,7 +65,7 @@ const MyProfile = () => {
             <FileDropzone previewUrl={user.profilePicture} onFileSelect={setProfilePicture} label="Profile Picture" />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Full Name" icon={<User size={16} />} value={name} onChange={(e) => setName(e.target.value)} />
+              <Input label="Full Name *" icon={<User size={16} />} value={name} onChange={(e) => setName(e.target.value)} />
               <Input label="Phone" type="tel" icon={<Phone size={16} />} value={phone} onChange={(e) => setPhone(e.target.value)} />
               <Input label="Email" icon={<Mail size={16} />} value={user.email} disabled className="opacity-70" />
               <Input label="Role" icon={<ShieldCheck size={16} />} value={ROLE_LABEL[user.role] ?? user.role} disabled className="opacity-70" />

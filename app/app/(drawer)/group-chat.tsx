@@ -32,8 +32,8 @@ import type { ChatMessage } from '@/lib/chat-api';
 import { fetchActiveDepartments } from '@/lib/departments-api';
 import { formatDateSeparator, formatMessageTime } from '@/lib/format-date';
 
-const PRIMARY = '#166534';
-const ACCENT = '#2e8b57';
+const PRIMARY = '#1d4ed8';
+const ACCENT = '#2563eb';
 
 // A message can only be edited within this window of sending it — mirrors
 // the backend guard in studentChatController.editMyMessage; this just keeps
@@ -339,7 +339,7 @@ export default function GroupChatScreen() {
                 position: 'absolute',
                 right: 16,
                 bottom: 16,
-                shadowColor: '#166534',
+                shadowColor: '#1d4ed8',
                 shadowOpacity: 0.3,
                 shadowRadius: 10,
                 shadowOffset: { width: 0, height: 6 },
@@ -446,7 +446,7 @@ export default function GroupChatScreen() {
           <View
             className="flex-row items-end gap-2 rounded-[28px] px-3.5 py-2"
             style={{
-              backgroundColor: isDark ? '#112019' : '#ffffff',
+              backgroundColor: isDark ? '#111a2e' : '#ffffff',
               shadowColor: '#0f172a',
               shadowOpacity: isDark ? 0.3 : 0.1,
               shadowRadius: 18,
@@ -457,7 +457,7 @@ export default function GroupChatScreen() {
               onPress={() => setShowDeptPicker((v) => !v)}
               hitSlop={8}
               className="h-9 w-9 items-center justify-center self-center rounded-full"
-              style={{ backgroundColor: taggedDepartment || showDeptPicker ? (isDark ? '#223d2d' : '#ecf7ef') : 'transparent' }}
+              style={{ backgroundColor: taggedDepartment || showDeptPicker ? (isDark ? '#22304d' : '#eff6ff') : 'transparent' }}
               accessibilityLabel="Tag a team">
               <Ionicons
                 name="pricetag-outline"
@@ -503,14 +503,14 @@ export default function GroupChatScreen() {
 }
 
 function DateSeparator({ label, isDark }: { label: string; isDark: boolean }) {
-  const lineColor = isDark ? '#1e293b' : '#dbe9e0';
+  const lineColor = isDark ? '#1e293b' : '#dbe4f0';
   return (
     <View className="my-4 flex-row items-center gap-3">
       <View style={{ flex: 1, height: 1, backgroundColor: lineColor }} />
       <Text
         className="rounded-full px-3.5 py-1 text-[11px] font-semibold"
         style={{
-          backgroundColor: isDark ? '#112019' : '#ffffff',
+          backgroundColor: isDark ? '#111a2e' : '#ffffff',
           color: isDark ? '#94a3b8' : '#64748b',
           shadowColor: '#0f172a',
           shadowOpacity: isDark ? 0 : 0.05,
@@ -544,7 +544,7 @@ function PinnedMessageBar({
       onPress={onPress}
       className="mx-3 mt-3 flex-row items-center gap-2.5 rounded-2xl px-3.5 py-2.5"
       style={{
-        backgroundColor: isDark ? '#112019' : '#ffffff',
+        backgroundColor: isDark ? '#111a2e' : '#ffffff',
         shadowColor: '#0f172a',
         shadowOpacity: isDark ? 0 : 0.06,
         shadowRadius: 8,
@@ -696,7 +696,7 @@ function MessageRow({
               width: MENU_WIDTH,
               borderRadius: 14,
               paddingVertical: 5,
-              backgroundColor: isDark ? '#1a2e22' : '#ffffff',
+              backgroundColor: isDark ? '#1a2540' : '#ffffff',
               borderWidth: 1,
               borderColor: isDark ? '#334155' : '#e8ecf3',
               shadowColor: '#0f172a',
@@ -734,7 +734,7 @@ function MessageRow({
           {!isAdmin ? kebabButton : null}
           {isAdmin ? (
             <LinearGradient
-              colors={isDark ? ['#223d2d', '#1a2e22'] : ['#d8eedf', '#ecf7ef']}
+              colors={isDark ? ['#22304d', '#1a2540'] : ['#dbe7fb', '#eff6ff']}
               style={{ marginRight: 8, height: 34, width: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
               <Text className="text-[11px] font-bold text-brand-600 dark:text-brand-300">
                 {getInitials(message.senderName || message.senderRole || 'Admin')}
@@ -768,7 +768,7 @@ function MessageRow({
                 <View
                   className="rounded-[22px] px-4 py-3"
                   style={{
-                    backgroundColor: isDark ? '#112019' : '#ffffff',
+                    backgroundColor: isDark ? '#111a2e' : '#ffffff',
                     borderTopLeftRadius: 6,
                     borderWidth: 1,
                     borderColor: isDark ? '#1e293b' : '#eef1f6',
@@ -829,7 +829,7 @@ function MessageRow({
                     borderTopRightRadius: 6,
                     paddingHorizontal: 16,
                     paddingVertical: 12,
-                    shadowColor: '#166534',
+                    shadowColor: '#1d4ed8',
                     shadowOpacity: 0.25,
                     shadowRadius: 10,
                     shadowOffset: { width: 0, height: 4 },
@@ -849,7 +849,7 @@ function MessageRow({
                 <Ionicons
                   name="checkmark-done"
                   size={14}
-                  color={message.fullyRead ? '#2e8b57' : isDark ? '#64748b' : '#94a3b8'}
+                  color={message.fullyRead ? '#2563eb' : isDark ? '#64748b' : '#94a3b8'}
                 />
               ) : null}
             </View>
@@ -903,10 +903,10 @@ function MessageBubbleContent({
           onPress={() => onJumpToQuoted(quoted._id)}
           className="mb-1.5 rounded-lg border-l-2 px-2 py-1"
           style={{
-            borderLeftColor: isAdmin ? (isDark ? '#86c99b' : '#166534') : 'rgba(255,255,255,0.6)',
-            backgroundColor: isAdmin ? (isDark ? '#0d1a13' : '#f8fafc') : 'rgba(255,255,255,0.14)',
+            borderLeftColor: isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : 'rgba(255,255,255,0.6)',
+            backgroundColor: isAdmin ? (isDark ? '#0d1424' : '#f8fafc') : 'rgba(255,255,255,0.14)',
           }}>
-          <Text className="text-[11px] font-semibold" style={{ color: isAdmin ? (isDark ? '#86c99b' : '#166534') : '#ffffff' }}>
+          <Text className="text-[11px] font-semibold" style={{ color: isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : '#ffffff' }}>
             {getSenderDisplay(quoted)}
           </Text>
           <Text
@@ -921,10 +921,22 @@ function MessageBubbleContent({
       {stageMeta ? (
         <View
           className="mb-1.5 flex-row items-center gap-1.5 self-start rounded-full px-3 py-1"
-          style={{ backgroundColor: isAdmin ? (isDark ? '#223d2d' : '#ecf7ef') : 'rgba(255,255,255,0.18)' }}>
-          <Ionicons name={stageMeta.icon} size={12} color={isAdmin ? (isDark ? '#86c99b' : '#166534') : '#ffffff'} />
-          <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#86c99b' : '#166534') : '#ffffff' }}>
+          style={{ backgroundColor: isAdmin ? (isDark ? '#22304d' : '#eff6ff') : 'rgba(255,255,255,0.18)' }}>
+          <Ionicons name={stageMeta.icon} size={12} color={isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : '#ffffff'} />
+          <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : '#ffffff' }}>
             {stageMeta.title}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Staff @mentioned this student. */}
+      {isAdmin && message.mentionsStudent ? (
+        <View
+          className="mb-1.5 flex-row items-center gap-1.5 self-start rounded-full px-3 py-1"
+          style={{ backgroundColor: isDark ? '#3a2e0d' : '#fef3c7' }}>
+          <Ionicons name="at" size={12} color={isDark ? '#fcd34d' : '#b45309'} />
+          <Text className="text-[11px] font-bold" style={{ color: isDark ? '#fcd34d' : '#b45309' }}>
+            You were mentioned
           </Text>
         </View>
       ) : null}
@@ -935,9 +947,9 @@ function MessageBubbleContent({
       {message.department ? (
         <View
           className="mb-1.5 flex-row items-center gap-1.5 self-start rounded-full px-3 py-1"
-          style={{ backgroundColor: isAdmin ? (isDark ? '#223d2d' : '#ecf7ef') : 'rgba(255,255,255,0.18)' }}>
-          <Ionicons name="pricetag" size={12} color={isAdmin ? (isDark ? '#86c99b' : '#166534') : '#ffffff'} />
-          <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#86c99b' : '#166534') : '#ffffff' }}>
+          style={{ backgroundColor: isAdmin ? (isDark ? '#22304d' : '#eff6ff') : 'rgba(255,255,255,0.18)' }}>
+          <Ionicons name="pricetag" size={12} color={isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : '#ffffff'} />
+          <Text className="text-[11px] font-bold" style={{ color: isAdmin ? (isDark ? '#93c5fd' : '#1d4ed8') : '#ffffff' }}>
             {message.department} Team
           </Text>
         </View>

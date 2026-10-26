@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { body } = require('express-validator');
-const { login, getMe, updateMe } = require('../controllers/authController');
+const { login, getMe, updateMe, forgotPassword, verifyResetOtp } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { profileUpload, verifyUploadedImage } = require('../middleware/uploadMiddleware');
 
@@ -29,6 +29,32 @@ router.post(
     body('password').notEmpty().withMessage('Password is required'),
   ],
   login
+);
+
+// Forgot-password OTP flow — unauthenticated, so throttled per IP.
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password reset requests. Please try again later.' },
+});
+
+router.post(
+  '/forgot-password',
+  forgotPasswordLimiter,
+  [body('email').isEmail().withMessage('A valid email is required')],
+  forgotPassword
+);
+
+router.post(
+  '/verify-reset-otp',
+  forgotPasswordLimiter,
+  [
+    body('email').isEmail().withMessage('A valid email is required'),
+    body('otp').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit code from your email'),
+  ],
+  verifyResetOtp
 );
 
 router.get('/me', protect, getMe);

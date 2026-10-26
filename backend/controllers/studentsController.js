@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
@@ -6,9 +7,10 @@ const ApiError = require('../utils/ApiError');
 const { sendMail } = require('../utils/mailer');
 const { buildStudentAccountEmailHtml, buildStudentPasswordResetEmailHtml } = require('../utils/emailTemplates');
 const { resolveAccount } = require('../utils/resolveAccount');
-const { sanitizeSif } = require('../utils/sifPayload');
+const { mergeSif } = require('../utils/sifPayload');
 const { syncInterestFormFromCrm } = require('../utils/crmSif');
 const { emitStudentProfileUpdated } = require('../socket');
+const { MILESTONES } = require('../constants/journeyStages');
 
 const PAYMENT_STATUSES = ['Paid in Full', 'Half Payment', 'Free'];
 
@@ -16,16 +18,9 @@ const PAYMENT_STATUSES = ['Paid in Full', 'Half Payment', 'Free'];
 // @route   GET /api/students
 // @access  Private/Staff (super_admin + every employee role)
 // The single "Filter" dropdown on the admin Students list (both admin and
-// employee accounts). Milestone values map to a journey stage that must be
-// completed (or, for a visa rejection, marked 'rejected'); the two account
-// states map straight to Student.status.
-const MILESTONE_STAGE = {
-  documentation_completed: { title: 'Documentation', status: 'completed' },
-  offer_received: { title: 'Offer Letters', status: 'completed' },
-  visa_approved: { title: 'Visa Status Update', status: 'completed' },
-  visa_rejected: { title: 'Visa Status Update', status: 'rejected' },
-};
-
+// employee accounts). Milestone values map to sub-step conditions that must
+// all hold (constants/journeyStages.MILESTONES); the two account states map
+// straight to Student.status.
 const getStudents = asyncHandler(async (req, res) => {
   const { search, status, intakeYear, intakeMonth, assignedCounsellor, milestone } = req.query;
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -43,8 +38,8 @@ const getStudents = asyncHandler(async (req, res) => {
 
   if (milestone === 'inactive') query.status = 'Inactive';
   else if (milestone === 'closed') query.status = 'Closed';
-  else if (Object.prototype.hasOwnProperty.call(MILESTONE_STAGE, milestone)) {
-    query.journey = { $elemMatch: MILESTONE_STAGE[milestone] };
+  else if (Object.prototype.hasOwnProperty.call(MILESTONES, milestone)) {
+    query.journey = { $all: MILESTONES[milestone].map((condition) => ({ $elemMatch: condition })) };
   }
 
   const [data, total] = await Promise.all([
@@ -59,6 +54,25 @@ const getStudents = asyncHandler(async (req, res) => {
     Student.countDocuments(query),
   ]);
 
+  // Per-viewer unread badge on each list card: student-sent messages this
+  // staff account hasn't read yet. Same readBy array adminChatController's
+  // getStudentChat grows when the thread is opened, so opening a chat clears
+  // its badge. aggregate() never casts, hence the explicit ObjectIds.
+  const unreadRows = data.length
+    ? await Message.aggregate([
+        {
+          $match: {
+            student: { $in: data.map((s) => s._id) },
+            sender: 'student',
+            deleted: { $ne: true },
+            readBy: { $ne: new mongoose.Types.ObjectId(req.user.id) },
+          },
+        },
+        { $group: { _id: '$student', count: { $sum: 1 } } },
+      ])
+    : [];
+  const unreadByStudent = new Map(unreadRows.map((r) => [String(r._id), r.count]));
+
   res.status(200).json({
     success: true,
     // The list cards only need journey / accountability / group / payment —
@@ -68,6 +82,7 @@ const getStudents = asyncHandler(async (req, res) => {
     data: data.map((s) => {
       const obj = s.toSafeObject(true);
       delete obj.sif;
+      obj.unreadCount = unreadByStudent.get(String(s._id)) ?? 0;
       return obj;
     }),
     pagination: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
@@ -102,6 +117,7 @@ const createStudent = asyncHandler(async (req, res) => {
     assignedCounsellor,
     groupName,
     paymentStatus,
+    paymentRemark,
     status,
   } = req.body;
 
@@ -110,6 +126,9 @@ const createStudent = asyncHandler(async (req, res) => {
   }
   if (paymentStatus && !PAYMENT_STATUSES.includes(paymentStatus)) {
     throw new ApiError(400, 'Invalid payment status');
+  }
+  if (paymentStatus && !(paymentRemark || '').trim()) {
+    throw new ApiError(400, 'A payment remark is required when setting the payment status');
   }
 
   const existing = await Student.findOne({ email: email.toLowerCase() });
@@ -145,6 +164,7 @@ const createStudent = asyncHandler(async (req, res) => {
     assignedCounsellor: (assignedCounsellor || '').trim(),
     groupName: (groupName || '').trim(),
     paymentStatus: paymentStatus || null,
+    paymentRemark: paymentStatus ? (paymentRemark || '').trim() : '',
     status,
     createdBy,
   });
@@ -191,12 +211,21 @@ const updateStudent = asyncHandler(async (req, res) => {
     assignedCounsellor,
     groupName,
     paymentStatus,
+    paymentRemark,
     status,
     sif,
   } = req.body;
 
   if (paymentStatus !== undefined && paymentStatus && !PAYMENT_STATUSES.includes(paymentStatus)) {
     throw new ApiError(400, 'Invalid payment status');
+  }
+  // Only checked when the request touches payment fields, so unrelated
+  // updates (e.g. SIF-only saves) on older records without a remark still go
+  // through.
+  const nextPaymentStatus = paymentStatus !== undefined ? paymentStatus || null : student.paymentStatus;
+  const nextPaymentRemark = paymentRemark !== undefined ? (paymentRemark || '').trim() : student.paymentRemark || '';
+  if ((paymentStatus !== undefined || paymentRemark !== undefined) && nextPaymentStatus && !nextPaymentRemark) {
+    throw new ApiError(400, 'A payment remark is required when setting the payment status');
   }
 
   // Login credentials (email/password) are only ever admin-editable here —
@@ -233,7 +262,10 @@ const updateStudent = asyncHandler(async (req, res) => {
   if (countryInterested !== undefined) student.countryInterested = countryInterested;
   if (assignedCounsellor !== undefined) student.assignedCounsellor = (assignedCounsellor || '').trim();
   if (groupName !== undefined) student.groupName = (groupName || '').trim();
-  if (paymentStatus !== undefined) student.paymentStatus = paymentStatus || null;
+  if (paymentStatus !== undefined || paymentRemark !== undefined) {
+    student.paymentStatus = nextPaymentStatus;
+    student.paymentRemark = nextPaymentStatus ? nextPaymentRemark : '';
+  }
 
   if (status !== undefined && status !== student.status) {
     // 'Closed' is the status value that toggles account access (isActive,
@@ -267,7 +299,7 @@ const updateStudent = asyncHandler(async (req, res) => {
   // Student Information Form (LOR/SOP intake notes) — free text, all
   // optional. Same normalization as the student self-service path.
   if (sif !== undefined && sif !== null) {
-    student.sif = sanitizeSif(sif, actor.name);
+    student.sif = mergeSif(student.sif, sif, actor.name);
   }
 
   student.updatedBy = actor;

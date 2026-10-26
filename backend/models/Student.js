@@ -96,7 +96,8 @@ const academicQualificationSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// One row of the "Internship / Industry Experience" table.
+// One row of the "Internship Experience" or "Industry Experience" table
+// (same columns, stored as two separate lists on sifSchema).
 const internshipRowSchema = new mongoose.Schema(
   {
     nameOfEmployer: { type: String, trim: true, default: '' },
@@ -133,6 +134,16 @@ const sifSchema = new mongoose.Schema(
     personalDetails: { type: personalDetailsSchema, default: () => ({}) },
     academicQualifications: { type: [academicQualificationSchema], default: [] },
     internshipExperience: { type: [internshipRowSchema], default: [] },
+    industryExperience: { type: [internshipRowSchema], default: [] },
+    // "Professional Details" answers: did the student do an internship /
+    // have industry experience ('yes' | 'no' | '' unanswered), and total
+    // years of industry experience. The rows themselves live in the two
+    // lists above.
+    professionalDetails: {
+      hasInternship: { type: String, trim: true, default: '' },
+      hasIndustryExperience: { type: String, trim: true, default: '' },
+      industryYears: { type: String, trim: true, default: '' },
+    },
     documentChecklist: { type: [documentChecklistItemSchema], default: [] },
     sop: {
       courseName: { type: String, trim: true, default: '' },
@@ -140,6 +151,23 @@ const sifSchema = new mongoose.Schema(
       additionalInfo: { type: String, trim: true, default: '' },
       expectationsToLearn: { type: String, trim: true, default: '' },
       futurePlans: { type: String, trim: true, default: '' },
+    },
+    // "Do you need assistance with your LOR / SOP?" — asked at the top of the
+    // app's LOR and SOP tabs ('yes' | 'no' | '' unanswered). The form is only
+    // shown (and filled) when the answer is 'yes'.
+    lorAssistance: { type: String, trim: true, default: '' },
+    sopAssistance: { type: String, trim: true, default: '' },
+    // When the student ticked "I agree" on the SIF Terms & Conditions. Set
+    // once, only from the student's own app (studentSifController) — staff
+    // can see it but not set it on the student's behalf.
+    termsAcceptedAt: { type: Date, default: null },
+    // When each form was first fully filled in — set once by
+    // utils/sifSubmissions, which posts the pinned "SIF is submitted" /
+    // "LOR is submitted" / "SOP is submitted" chat message at that moment.
+    submittedAt: {
+      sif: { type: Date, default: null },
+      lor: { type: Date, default: null },
+      sop: { type: Date, default: null },
     },
     updatedAt: { type: Date, default: null },
     updatedByName: { type: String, default: null },
@@ -186,6 +214,23 @@ const studentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Forgot-password OTP (see authController.forgotPassword). Only the
+    // bcrypt hash is stored; select:false keeps it out of every normal read.
+    resetOtpHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    resetOtpExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    resetOtpAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
     // Pipeline/lifecycle label. Only cross-wired with isActive at the
     // Deactivate/Reactivate action (see studentsController.updateStudent) —
     // isActive is the sole field authController.login checks, so that check
@@ -216,6 +261,14 @@ const studentSchema = new mongoose.Schema(
       type: String,
       enum: ['Paid in Full', 'Half Payment', 'Free', null],
       default: null,
+    },
+    // Staff note explaining the payment confirmation above (amount, receipt
+    // ref, why it's free, ...). Required whenever paymentStatus is set — see
+    // studentsController.js.
+    paymentRemark: {
+      type: String,
+      trim: true,
+      default: '',
     },
 
     // Denormalized snapshots of who created / last updated this student
@@ -272,21 +325,43 @@ const studentSchema = new mongoose.Schema(
     source: { type: String, default: 'wizdom' },
 
     // Read-only from the Student App's perspective — the "My Journey"
-    // screen only ever GETs this. Only Admin-side tooling (not built yet)
-    // is meant to write to it. Missing/unset stages default to "pending"
-    // at read-time (see studentJourneyController.js), so this can stay
-    // empty until an admin actually starts updating a student's progress.
+    // screen only ever GETs this; staff write it from the Admin Panel's
+    // Journey tab. Two kinds of entry, keyed by `title`: sub-steps
+    // ("Finance / Funds") carry a status, steps ("Finance") carry remarks.
+    // Missing entries default at read-time (see utils/journeySteps.js), so
+    // this can stay empty until staff start updating a student's progress.
     journey: {
       type: [
         {
           _id: false,
           title: { type: String, required: true },
-          status: {
-            type: String,
-            enum: ['pending', 'in_progress', 'completed', 'rejected'],
-            default: 'pending',
-          },
+          // A sub-step's status value — validated per sub-step against
+          // constants/journeyStages.js (each has its own options), so no
+          // fixed enum here. Unused on step entries, which only hold remarks.
+          status: { type: String, default: 'pending' },
           updatedAt: { type: Date, default: null },
+          // Staff remarks for this stage — each one its own entry with who
+          // added it, written on the admin Journey tab and shown under the
+          // stage in the student app. Deliberately NOT chat messages (see
+          // adminJourneyController.addStudentJourneyRemark).
+          remarks: {
+            type: [
+              {
+                text: { type: String, trim: true, required: true },
+                byId: { type: mongoose.Schema.Types.ObjectId, default: null },
+                byName: { type: String, default: '' },
+                // Team label ("Admin", "Visa", ...) — the only author info
+                // the student app shows, same rule as chat senderRole.
+                byRole: { type: String, default: '' },
+                createdAt: { type: Date, default: Date.now },
+              },
+            ],
+            default: [],
+          },
+          // Single-remark field from the previous version — read as one
+          // legacy entry (author unknown) when `remarks` is empty.
+          remark: { type: String, trim: true, default: '' },
+          remarkUpdatedAt: { type: Date, default: null },
         },
       ],
       default: [],
@@ -333,8 +408,8 @@ const studentSchema = new mongoose.Schema(
     },
 
     // Recomputed by adminJourneyController.updateStudentJourneyStage
-    // whenever a stage changes — true only once every one of the 21 stages
-    // is 'completed'. Drives the card's Green ("Resolved") state.
+    // whenever a sub-step changes — true only once every sub-step of all
+    // 7 steps is done (see utils/journeySteps.isJourneyCompleted). Drives the card's Green ("Resolved") state.
     journeyCompleted: {
       type: Boolean,
       default: false,
@@ -428,12 +503,14 @@ studentSchema.methods.toSafeObject = function toSafeObject(includeAccountability
   if (!includeAccountability) return base;
 
   // 'awaiting' always wins (someone needs to act now); otherwise Green only
-  // once the whole 21-stage journey is done, else the default in-progress
+  // once the whole 7-step journey is done, else the default in-progress
   // state — see the Students module accountability-system plan.
   const responseStatus = this.awaitingReply ? 'awaiting' : this.journeyCompleted ? 'resolved' : 'in_progress';
 
   return {
     ...base,
+    // Staff-only payment note — never sent to the student's own app.
+    paymentRemark: this.paymentRemark,
     responsibleDepartment: this.responsibleDepartment,
     awaitingReply: this.awaitingReply,
     awaitingSince: this.awaitingSince,

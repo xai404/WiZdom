@@ -3,7 +3,7 @@ const Student = require('../models/Student');
 const Message = require('../models/Message');
 const Employee = require('../models/Employee');
 const ApiError = require('../utils/ApiError');
-const { JOURNEY_STAGES } = require('../constants/journeyStages');
+const { stepForStageTag } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { sendPushToStudent } = require('../utils/pushService');
 const { resolveAccount } = require('../utils/resolveAccount');
@@ -114,12 +114,16 @@ const getStudentChat = asyncHandler(async (req, res) => {
 // @route   POST /api/students/:id/chat
 // @access  Private/Staff (super_admin + every employee role)
 const postAdminMessage = asyncHandler(async (req, res) => {
-  const { text, stage, replyTo, department } = req.body;
+  const { text, replyTo, department } = req.body;
+  // A reply to an older message may carry a pre-7-step stage title — file
+  // it under that stage's step.
+  const stage = req.body.stage ? stepForStageTag(req.body.stage) : null;
+  const mentionStudent = req.body.mentionStudent === true;
 
   if (!text || !text.trim()) {
     throw new ApiError(400, 'Message text is required');
   }
-  if (stage && !JOURNEY_STAGES.includes(stage)) {
+  if (req.body.stage && !stage) {
     throw new ApiError(400, 'Invalid stage');
   }
   if (department && !Employee.DEPARTMENTS.includes(department)) {
@@ -157,6 +161,7 @@ const postAdminMessage = asyncHandler(async (req, res) => {
     text: text.trim(),
     stage: stage || null,
     department: department || null,
+    mentionsStudent: mentionStudent,
     replyTo: replyTo || null,
     // Trivially "read" by whoever sent it — see readBy on Message.js.
     readBy: [sender.id],
@@ -216,10 +221,16 @@ const postAdminMessage = asyncHandler(async (req, res) => {
   // screen must only ever show journey/application updates, never chat
   // content (chat already has its own real-time delivery + unread badge).
   try {
+    // senderRole (department / "Admin"), never the staff member's own name —
+    // same rule as the chat itself (see Message.senderRole).
     await sendPushToStudent(student, {
-      title: stage ? `New remark on ${stage}` : 'New message',
+      title: mentionStudent
+        ? `${sender.displayRole || 'WiZdom'} mentioned you`
+        : stage
+          ? `New remark on ${stage}`
+          : 'New message',
       body: text.trim(),
-      data: { type: 'chat_message', stage: stage || null },
+      data: { type: 'chat_message', stage: stage || null, mention: mentionStudent },
     });
   } catch (err) {
     console.error(`[adminChatController] push to student=${student._id} failed:`, err);
@@ -249,10 +260,14 @@ const postAdminMessage = asyncHandler(async (req, res) => {
 //          hides it, rendering a "This message was deleted" tombstone in
 //          place of the text whenever `deleted` is true.
 // @route   DELETE /api/students/:id/chat/:messageId
-// @access  Private/Staff (super_admin + every employee role)
+// @access  Private/Staff (message's own sender only)
 const deleteAdminMessage = asyncHandler(async (req, res) => {
   const message = await Message.findOne({ _id: req.params.messageId, student: req.params.id });
   if (!message) throw new ApiError(404, 'Message not found');
+
+  if (message.sender !== 'admin' || String(message.senderId) !== String(req.user.id)) {
+    throw new ApiError(403, 'You can only delete your own messages');
+  }
 
   if (!message.deleted) {
     message.deleted = true;
@@ -265,8 +280,8 @@ const deleteAdminMessage = asyncHandler(async (req, res) => {
 
 // @desc    Permanently clear a student's ENTIRE Group Chat thread — every
 //          message, including stage-tagged ones. Unlike single-message
-//          delete (a soft, audit-trailed tombstone any staff member can
-//          apply to any message), this is a real hard delete with no undo,
+//          delete (a soft, audit-trailed tombstone a staff member can
+//          apply to their own messages), this is a real hard delete with no undo,
 //          which is why it's restricted to admin/super_admin. It also wipes
 //          journey remarks for any stage whose only remark was a chat
 //          message — see the Message schema's `stage` field and
@@ -300,10 +315,8 @@ const clearStudentChat = asyncHandler(async (req, res) => {
 const EDIT_WINDOW_MS = 10 * 60 * 1000;
 
 // @desc    Edit the text of one of the CURRENT staff member's own messages,
-//          within 10 minutes of sending it. Unlike delete (any staff member
-//          may delete any admin message) this is restricted to the
-//          message's own sender — editing someone else's words isn't the
-//          same kind of action as retracting your own.
+//          within 10 minutes of sending it. Like delete, this is restricted
+//          to the message's own sender.
 // @route   PATCH /api/students/:id/chat/:messageId
 // @access  Private/Staff (message's own sender only)
 const editAdminMessage = asyncHandler(async (req, res) => {

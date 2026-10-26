@@ -8,7 +8,12 @@ const {
   updateStudent,
   deleteStudent,
 } = require('../controllers/studentsController');
-const { getStudentJourney, updateStudentJourneyStage } = require('../controllers/adminJourneyController');
+const {
+  getStudentJourney,
+  updateStudentJourneyStage,
+  addStudentJourneyRemark,
+  deleteStudentJourneyRemark,
+} = require('../controllers/adminJourneyController');
 const {
   getStudentChat,
   postAdminMessage,
@@ -43,6 +48,9 @@ router
   .route('/:id/journey')
   .get(getStudentJourney)
   .patch(updateStudentJourneyStage);
+
+router.post('/:id/journey/remarks', addStudentJourneyRemark);
+router.delete('/:id/journey/remarks/:remarkId', deleteStudentJourneyRemark);
 
 router
   .route('/:id/chat')

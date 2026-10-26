@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -9,11 +8,14 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +25,7 @@ import { PRIVACY_POLICY_URL } from '@/constants/config';
 import { useAuth } from '@/context/auth-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatShortDate } from '@/lib/format-date';
-import { resetMyPassword } from '@/lib/auth-api';
+import { changeMyPassword } from '@/lib/auth-api';
 
 function getInitials(name?: string) {
   if (!name) return 'S';
@@ -42,8 +44,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 // Read-only by design — a student's profile is managed by their counsellor
 // / admin via the Admin Panel, not self-editable in the app. Resetting
-// their own password is the one exception (see handleResetPassword).
-type ResetStep = 'confirm' | 'loading' | 'result' | 'error';
+// their own password is the one exception (see ChangePasswordModal).
 
 export default function ProfileScreen() {
   const { user, token, logout } = useAuth();
@@ -52,9 +53,8 @@ export default function ProfileScreen() {
   const fade = useRef(new Animated.Value(0)).current;
   // Alert.alert isn't reliably supported on React Native Web (this app's
   // other flows avoid it too — see the Toast component) — a real Modal
-  // works consistently everywhere, so the whole confirm/result flow lives
-  // in one here instead.
-  const [resetModal, setResetModal] = useState<{ step: ResetStep; password?: string; error?: string } | null>(null);
+  // works consistently everywhere, so the change-password form lives in one.
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -65,20 +65,6 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     logout();
     router.replace('/login');
-  };
-
-  const openResetModal = () => setResetModal({ step: 'confirm' });
-  const closeResetModal = () => setResetModal(null);
-
-  const confirmReset = async () => {
-    if (!token) return;
-    setResetModal({ step: 'loading' });
-    try {
-      const newPassword = await resetMyPassword(token);
-      setResetModal({ step: 'result', password: newPassword });
-    } catch (err) {
-      setResetModal({ step: 'error', error: err instanceof Error ? err.message : 'Please try again.' });
-    }
   };
 
   return (
@@ -96,7 +82,7 @@ export default function ProfileScreen() {
             />
           ) : (
             <LinearGradient
-              colors={['#2e8b57', '#166534']}
+              colors={['#2563eb', '#1d4ed8']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -105,7 +91,7 @@ export default function ProfileScreen() {
                 borderRadius: 48,
                 alignItems: 'center',
                 justifyContent: 'center',
-                shadowColor: '#166534',
+                shadowColor: '#1d4ed8',
                 shadowOpacity: 0.35,
                 shadowRadius: 16,
                 shadowOffset: { width: 0, height: 8 },
@@ -131,7 +117,7 @@ export default function ProfileScreen() {
               <Divider />
               <View className="flex-row items-center gap-3 px-4 py-3.5">
                 <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
-                  <Ionicons name="calendar-outline" size={17} color={isDark ? '#86c99b' : '#166534'} />
+                  <Ionicons name="calendar-outline" size={17} color={isDark ? '#93c5fd' : '#1d4ed8'} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs text-slate-400 dark:text-slate-500">Joined</Text>
@@ -149,10 +135,10 @@ export default function ProfileScreen() {
             </DetailCard>
 
             <AnimatedActionButton
-              onPress={openResetModal}
+              onPress={() => setChangePasswordOpen(true)}
               icon="key-outline"
               label="Reset Password"
-              color={isDark ? '#86c99b' : '#166534'}
+              color={isDark ? '#93c5fd' : '#1d4ed8'}
               backgroundColor={isDark ? 'rgba(134,201,155,0.1)' : '#eef2ff'}
               style={{ marginTop: 20 }}
             />
@@ -178,42 +164,73 @@ export default function ProfileScreen() {
         </Animated.View>
       </ScrollView>
 
-      <ResetPasswordModal state={resetModal} onCancel={closeResetModal} onConfirm={confirmReset} onDone={closeResetModal} />
+      <ChangePasswordModal visible={changePasswordOpen} token={token} onClose={() => setChangePasswordOpen(false)} />
     </SafeAreaView>
   );
 }
 
-function ResetPasswordModal({
-  state,
-  onCancel,
-  onConfirm,
-  onDone,
-}: {
-  state: { step: ResetStep; password?: string; error?: string } | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-  onDone: () => void;
-}) {
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+function ChangePasswordModal({ visible, token, onClose }: { visible: boolean; token: string | null; onClose: () => void }) {
   const { isDark } = useAppTheme();
-  const accent = isDark ? '#86c99b' : '#166534';
-  const [copied, setCopied] = useState(false);
+  const accent = isDark ? '#93c5fd' : '#1d4ed8';
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
+  // Fresh form every time it opens.
   useEffect(() => {
-    if (state?.step !== 'result') setCopied(false);
-  }, [state?.step]);
+    if (!visible) return;
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError(null);
+    setSuccess(false);
+    setLoading(false);
+  }, [visible]);
 
-  const handleCopy = async () => {
-    if (!state?.password) return;
-    await Clipboard.setStringAsync(state.password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleSubmit = async () => {
+    if (!token) return;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError('Please fill in all the password fields.');
+      return;
+    }
+    if (!PASSWORD_RULE.test(newPassword)) {
+      setError('Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirm password do not match.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError('New password must be different from your current password.');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      await changeMyPassword(token, currentPassword, newPassword, confirmPassword);
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Modal visible={!!state} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,14,8,0.55)' }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={state?.step === 'confirm' || state?.step === 'error' ? onCancel : undefined} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={loading ? undefined : onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          pointerEvents="box-none">
           <View
             className="w-full max-w-sm overflow-hidden rounded-3xl bg-card p-6 dark:bg-card-dark"
             style={{
@@ -223,78 +240,95 @@ function ResetPasswordModal({
               shadowOffset: { width: 0, height: 12 },
               elevation: 12,
             }}>
-            {state?.step === 'confirm' && (
+            {success ? (
+              <>
+                <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950">
+                  <Ionicons name="checkmark-circle-outline" size={22} color="#10b981" />
+                </View>
+                <Text className="text-lg font-bold text-slate-900 dark:text-white">Password Changed</Text>
+                <Text className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  Use your new password the next time you log in.
+                </Text>
+                <Pressable onPress={onClose} className="mt-5 items-center justify-center rounded-2xl bg-brand-600 py-3 active:opacity-90">
+                  <Text className="text-[15px] font-semibold text-white">Done</Text>
+                </Pressable>
+              </>
+            ) : (
               <>
                 <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
                   <Ionicons name="key-outline" size={20} color={accent} />
                 </View>
                 <Text className="text-lg font-bold text-slate-900 dark:text-white">Reset Password</Text>
-                <Text className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  This generates a brand new password for your account and emails it to you. Continue?
+                <Text className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  Enter your current password, then choose a new one.
                 </Text>
+
+                <View className="mt-5 gap-3">
+                  <PasswordField placeholder="Old password" value={currentPassword} onChangeText={setCurrentPassword} autoComplete="current-password" />
+                  <PasswordField placeholder="New password" value={newPassword} onChangeText={setNewPassword} autoComplete="new-password" />
+                  <PasswordField placeholder="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} autoComplete="new-password" />
+                </View>
+
+                <Text className="mt-2.5 text-xs leading-4 text-slate-400 dark:text-slate-500">
+                  At least 8 characters with uppercase, lowercase, a number and a special character.
+                </Text>
+
+                {error ? <Text className="mt-3 text-sm text-red-500">{error}</Text> : null}
+
                 <View className="mt-6 flex-row gap-3">
-                  <Pressable onPress={onCancel} className="flex-1 items-center justify-center rounded-2xl bg-slate-100 py-3 active:bg-slate-200 dark:bg-slate-800 dark:active:bg-slate-700">
+                  <Pressable
+                    onPress={onClose}
+                    disabled={loading}
+                    className="flex-1 items-center justify-center rounded-2xl bg-slate-100 py-3 active:bg-slate-200 dark:bg-slate-800 dark:active:bg-slate-700">
                     <Text className="text-[15px] font-semibold text-slate-600 dark:text-slate-300">Cancel</Text>
                   </Pressable>
-                  <Pressable onPress={onConfirm} className="flex-1 items-center justify-center rounded-2xl bg-brand-600 py-3 active:opacity-90">
-                    <Text className="text-[15px] font-semibold text-white">Reset</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-
-            {state?.step === 'loading' && (
-              <View className="items-center py-4">
-                <ActivityIndicator size="large" color={accent} />
-                <Text className="mt-4 text-sm text-slate-500 dark:text-slate-400">Resetting your password…</Text>
-              </View>
-            )}
-
-            {state?.step === 'result' && (
-              <>
-                <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950">
-                  <Ionicons name="checkmark-circle-outline" size={22} color="#10b981" />
-                </View>
-                <Text className="text-lg font-bold text-slate-900 dark:text-white">Password Reset</Text>
-                <Text className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  Your new password (also emailed to you):
-                </Text>
-                <View className="mt-3 flex-row items-center gap-2 rounded-2xl bg-slate-100 py-3.5 pl-4 pr-3 dark:bg-slate-800">
-                  <Text selectable className="flex-1 text-center text-base font-bold tracking-wide text-slate-900 dark:text-white">
-                    {state.password}
-                  </Text>
                   <Pressable
-                    onPress={handleCopy}
-                    hitSlop={8}
-                    className="h-9 w-9 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-slate-700">
-                    <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={copied ? '#10b981' : accent} />
+                    onPress={handleSubmit}
+                    disabled={loading}
+                    className="flex-1 items-center justify-center rounded-2xl bg-brand-600 py-3 active:opacity-90">
+                    {loading ? <ActivityIndicator color="#ffffff" /> : <Text className="text-[15px] font-semibold text-white">Update</Text>}
                   </Pressable>
                 </View>
-                <Text className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                  {copied ? 'Copied to clipboard!' : 'Use this the next time you log in.'}
-                </Text>
-                <Pressable onPress={onDone} className="mt-5 items-center justify-center rounded-2xl bg-brand-600 py-3 active:opacity-90">
-                  <Text className="text-[15px] font-semibold text-white">Done</Text>
-                </Pressable>
-              </>
-            )}
-
-            {state?.step === 'error' && (
-              <>
-                <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-red-50 dark:bg-red-950">
-                  <Ionicons name="alert-circle-outline" size={22} color="#ef4444" />
-                </View>
-                <Text className="text-lg font-bold text-slate-900 dark:text-white">Could Not Reset Password</Text>
-                <Text className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{state.error}</Text>
-                <Pressable onPress={onCancel} className="mt-5 items-center justify-center rounded-2xl bg-slate-100 py-3 active:bg-slate-200 dark:bg-slate-800 dark:active:bg-slate-700">
-                  <Text className="text-[15px] font-semibold text-slate-600 dark:text-slate-300">Close</Text>
-                </Pressable>
               </>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
+  );
+}
+
+function PasswordField({
+  placeholder,
+  value,
+  onChangeText,
+  autoComplete,
+}: {
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  autoComplete: 'current-password' | 'new-password';
+}) {
+  const { isDark } = useAppTheme();
+  const [visible, setVisible] = useState(false);
+  return (
+    <View className="flex-row items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 dark:border-slate-700 dark:bg-slate-800">
+      <Ionicons name="lock-closed-outline" size={17} color={isDark ? '#64748b' : '#94a3b8'} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+        secureTextEntry={!visible}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete={autoComplete}
+        className="ml-2.5 flex-1 py-3 text-[15px] text-slate-900 dark:text-white"
+      />
+      <Pressable onPress={() => setVisible((v) => !v)} hitSlop={10} accessibilityLabel={visible ? 'Hide password' : 'Show password'}>
+        <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={18} color={isDark ? '#64748b' : '#94a3b8'} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -364,7 +398,7 @@ function DetailRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMa
   return (
     <View className="flex-row items-center gap-3 px-4 py-3.5">
       <View className="h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-slate-900/40">
-        <Ionicons name={icon} size={17} color={isDark ? '#86c99b' : '#166534'} />
+        <Ionicons name={icon} size={17} color={isDark ? '#93c5fd' : '#1d4ed8'} />
       </View>
       <View className="flex-1">
         <Text className="text-xs text-slate-400 dark:text-slate-500">{label}</Text>

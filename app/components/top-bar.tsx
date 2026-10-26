@@ -6,8 +6,8 @@ import { Animated, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-const PRIMARY = '#166534';
-const ACCENT = '#2e8b57';
+const PRIMARY = '#1d4ed8';
+const ACCENT = '#2563eb';
 
 // Matches ChatHeader's gradient/shadow/rounded-corner treatment exactly —
 // used by Courses/Notifications/Profile/Settings so every screen in the
@@ -31,7 +31,7 @@ export function TopBar({ title }: { title?: string }) {
 
   return (
     <LinearGradient
-      colors={isDark ? ['#05190e', '#0b2e1b', PRIMARY] : ['#05190e', PRIMARY, ACCENT]}
+      colors={isDark ? ['#0b1530', '#0b1f45', PRIMARY] : ['#0b1530', PRIMARY, ACCENT]}
       start={{ x: 0.05, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
@@ -40,7 +40,7 @@ export function TopBar({ title }: { title?: string }) {
         paddingHorizontal: 12,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
-        shadowColor: '#082414',
+        shadowColor: '#081a3a',
         shadowOpacity: 0.26,
         shadowRadius: 24,
         shadowOffset: { width: 0, height: 12 },
@@ -73,7 +73,7 @@ export function TopBar({ title }: { title?: string }) {
           accessibilityLabel="Toggle dark mode"
           className="h-10 w-10 items-center justify-center rounded-full active:bg-white/10">
           <Animated.View style={{ transform: [{ rotate }] }}>
-            <Ionicons name={isDark ? 'moon' : 'sunny'} size={19} color={isDark ? '#c4e3cd' : '#ffd166'} />
+            <Ionicons name={isDark ? 'moon' : 'sunny'} size={19} color={isDark ? '#c7dbf8' : '#ffd166'} />
           </Animated.View>
         </Pressable>
       </View>

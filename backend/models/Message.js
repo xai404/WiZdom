@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { JOURNEY_STAGES } = require('../constants/journeyStages');
+const { JOURNEY_STAGES, LEGACY_STAGES } = require('../constants/journeyStages');
 const Employee = require('./Employee');
 
 // The single Group Chat thread lives here — one document per message, all
@@ -47,9 +47,11 @@ const messageSchema = new mongoose.Schema(
       required: [true, 'Message text is required'],
       trim: true,
     },
+    // A journey step title. Legacy stage titles stay valid so messages
+    // tagged before the 7-step journey can still be edited/deleted.
     stage: {
       type: String,
-      enum: [...JOURNEY_STAGES, null],
+      enum: [...new Set([...JOURNEY_STAGES, ...Object.keys(LEGACY_STAGES)]), null],
       default: null,
     },
     // Department tag — orthogonal to `stage` (a message can carry either,
@@ -60,6 +62,12 @@ const messageSchema = new mongoose.Schema(
       type: String,
       enum: [...Employee.DEPARTMENTS, null],
       default: null,
+    },
+    // Staff @mentioned the student on this message (admin messages only) —
+    // highlighted in the Student App and sent as a "you were mentioned" push.
+    mentionsStudent: {
+      type: Boolean,
+      default: false,
     },
     // Whether the student has read this message — only meaningful for
     // admin-sent messages (a student's own message is trivially "read" by

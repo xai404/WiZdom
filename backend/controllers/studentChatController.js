@@ -3,7 +3,7 @@ const Student = require('../models/Student');
 const Message = require('../models/Message');
 const Employee = require('../models/Employee');
 const ApiError = require('../utils/ApiError');
-const { JOURNEY_STAGES } = require('../constants/journeyStages');
+const { stepForStageTag } = require('../constants/journeyStages');
 const { createNotification } = require('../utils/notify');
 const { getActiveParticipantIds, attachReadStatus } = require('../utils/chatReadStatus');
 const { isDepartmentStaffed } = require('../utils/departments');
@@ -91,12 +91,15 @@ const getMyChat = asyncHandler(async (req, res) => {
 // @route   POST /api/student/chat/reply
 // @access  Private/Student
 const postChatReply = asyncHandler(async (req, res) => {
-  const { text, stage, replyTo, department } = req.body;
+  const { text, replyTo, department } = req.body;
+  // A reply to an older message may carry a pre-7-step stage title — file
+  // it under that stage's step.
+  const stage = req.body.stage ? stepForStageTag(req.body.stage) : null;
 
   if (!text || !text.trim()) {
     throw new ApiError(400, 'Message text is required');
   }
-  if (stage && !JOURNEY_STAGES.includes(stage)) {
+  if (req.body.stage && !stage) {
     throw new ApiError(400, 'Invalid stage');
   }
   if (department && !Employee.DEPARTMENTS.includes(department)) {

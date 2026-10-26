@@ -27,9 +27,9 @@ import { loginRequest } from '@/lib/auth-api';
 import { fetchHelplineContact } from '@/lib/support-contacts-api';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PRIMARY = '#166534';
-const ACCENT = '#2e8b57';
-const SKY = '#86c99b';
+const PRIMARY = '#1d4ed8';
+const ACCENT = '#2563eb';
+const SKY = '#93c5fd';
 // Web has no native animated driver (RN Web falls back to JS animation and
 // logs a warning if this is left `true`); native platforms keep the
 // perf benefit.
@@ -108,7 +108,7 @@ function AbstractShapes() {
           width: 260,
           height: 260,
           borderRadius: 130,
-          backgroundColor: 'rgba(46,139,87,0.10)',
+          backgroundColor: 'rgba(37,99,235,0.10)',
         }}
       />
       <View
@@ -203,7 +203,7 @@ export default function LoginScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient
-        colors={['#020617', '#0a2a18', '#16452a', PRIMARY]}
+        colors={['#020617', '#0a1d42', '#163063', PRIMARY]}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.95, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -322,6 +322,13 @@ export default function LoginScreen() {
                           onRightIconPress={() => setShowPassword((prev) => !prev)}
                         />
                       </View>
+
+                      <Pressable
+                        onPress={() => router.push('/forgot-password' as never)}
+                        hitSlop={8}
+                        style={{ alignSelf: 'flex-end', marginTop: 12 }}>
+                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: SKY }}>Forgot password?</Text>
+                      </Pressable>
 
                       <LoginButton loading={loading} onPress={handleLogin} />
                     </View>

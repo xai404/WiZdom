@@ -55,7 +55,7 @@ export function ChatBackground() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient
-        colors={isDark ? ['#07120c', '#0a1a10', '#08140d'] : ['#eef7f1', '#f5faf7', '#e8f3ec']}
+        colors={isDark ? ['#070e1c', '#0a1428', '#08101f'] : ['#eef4fd', '#f5f8fd', '#e8effb']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.7, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -70,7 +70,7 @@ export function ChatBackground() {
           width: 340,
           height: 340,
           borderRadius: 170,
-          backgroundColor: isDark ? 'rgba(46,139,87,0.14)' : 'rgba(46,139,87,0.12)',
+          backgroundColor: isDark ? 'rgba(37,99,235,0.14)' : 'rgba(37,99,235,0.12)',
         }}
       />
 

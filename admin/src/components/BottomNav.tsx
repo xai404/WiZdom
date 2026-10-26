@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { LayoutDashboard, Users, BookOpen, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const navItems = [
+export const navItems = [
   {
     to: '/dashboard',
     label: 'Dashboard',
@@ -34,9 +34,14 @@ const navItems = [
 // entirely, same items, same role filtering. Fixed to the viewport bottom
 // so it never scrolls with page content; DashboardLayout reserves matching
 // bottom padding on `main` so content never sits underneath it.
-const BottomNav = () => {
+// Shared with TopBar's inline nav (used on full-screen pages).
+export const useVisibleNavItems = () => {
   const { user } = useAuth();
-  const visibleNavItems = navItems.filter((item) => user && item.roles.includes(user.role));
+  return navItems.filter((item) => user && item.roles.includes(user.role));
+};
+
+const BottomNav = () => {
+  const visibleNavItems = useVisibleNavItems();
 
   return (
     <nav

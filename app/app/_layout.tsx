@@ -19,6 +19,7 @@ function RootNavigation() {
       <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="forgot-password" />
         <Stack.Screen name="(drawer)" />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />

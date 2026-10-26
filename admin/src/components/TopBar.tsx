@@ -1,14 +1,28 @@
 import { ArrowLeft, GraduationCap, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
+import { useVisibleNavItems } from './BottomNav';
 
-const TopBar = () => {
+interface TopBarProps {
+  // Show the main nav links here — for full-screen pages that hide BottomNav.
+  showNav?: boolean;
+}
+
+const TopBar = ({ showNav = false }: TopBarProps) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const navItems = useVisibleNavItems();
 
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-between border-b border-brand-100/70 bg-white/80 px-4 py-3 backdrop-blur-xl sm:px-6">
+    <div
+      className={clsx(
+        'sticky top-0 z-50 flex items-center justify-between border-b border-brand-100/70 bg-white/80 px-4 backdrop-blur-xl sm:px-6',
+        // Full-screen pages get a slimmer bar to leave more room below.
+        showNav ? 'py-1.5' : 'py-3'
+      )}
+    >
       <div className="flex items-center gap-2">
         <button
           onClick={() => navigate(-1)}
@@ -22,6 +36,26 @@ const TopBar = () => {
         </div>
         <span className="text-base font-semibold tracking-tight text-slate-900">WiZdom</span>
       </div>
+      {showNav && (
+        <nav className="flex items-center gap-0.5">
+          {navItems.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              title={label}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors',
+                  isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                )
+              }
+            >
+              <Icon size={17} />
+              <span className="hidden md:inline">{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      )}
       <div className="flex items-center gap-1">
         <NotificationBell variant="dark" />
         <button

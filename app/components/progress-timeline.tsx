@@ -6,13 +6,13 @@ import { Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } f
 import { EmptyState } from '@/components/empty-state';
 import { JourneyHeroCard } from '@/components/journey-hero-card';
 import { LottieLoader } from '@/components/lottie-loader';
-import { getStageMetaByTitle, STATUS_META } from '@/constants/journey-meta';
+import { STATUS_META } from '@/constants/journey-meta';
 import { useJourney } from '@/context/journey-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatRelativeShort } from '@/lib/format-date';
-import type { JourneyStage, JourneyStageStatus } from '@/lib/journey-api';
+import type { JourneyRemark, JourneyStage, JourneyStageStatus } from '@/lib/journey-api';
 
-const PRIMARY = '#166534';
+const PRIMARY = '#1d4ed8';
 const AMBER = '#eab308';
 const GREEN = '#22c55e';
 
@@ -73,7 +73,7 @@ export function ProgressTimeline() {
       contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
       className="px-5"
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#86c99b' : '#166534'} />}>
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#93c5fd' : '#1d4ed8'} />}>
       <View className="w-full max-w-2xl self-center pt-3">
         <Text className="mb-4 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Your Progress</Text>
 
@@ -89,7 +89,7 @@ export function ProgressTimeline() {
           <View
             style={{ width: 38, height: 38, borderRadius: 12 }}
             className="items-center justify-center bg-brand-50 dark:bg-brand-950">
-            <Ionicons name="clipboard-outline" size={18} color={isDark ? '#86c99b' : PRIMARY} />
+            <Ionicons name="clipboard-outline" size={18} color={isDark ? '#93c5fd' : PRIMARY} />
           </View>
           <View className="flex-1">
             <Text className="text-[14.5px] font-semibold text-slate-900 dark:text-white">
@@ -158,7 +158,7 @@ function FilterPills({ active, onChange, isDark }: { active: FilterKey; onChange
               justifyContent: 'center',
               paddingVertical: 8,
               borderRadius: 14,
-              backgroundColor: isActive ? (isDark ? '#1a2e22' : '#ffffff') : 'transparent',
+              backgroundColor: isActive ? (isDark ? '#1a2540' : '#ffffff') : 'transparent',
               shadowColor: '#0f172a',
               shadowOpacity: isActive && !isDark ? 0.08 : 0,
               shadowRadius: 6,
@@ -168,7 +168,7 @@ function FilterPills({ active, onChange, isDark }: { active: FilterKey; onChange
             <Text
               numberOfLines={1}
               className="text-[11.5px] font-semibold"
-              style={{ color: isActive ? (isDark ? '#86c99b' : PRIMARY) : isDark ? '#64748b' : '#94a3b8' }}>
+              style={{ color: isActive ? (isDark ? '#93c5fd' : PRIMARY) : isDark ? '#64748b' : '#94a3b8' }}>
               {f.label}
             </Text>
           </Pressable>
@@ -192,7 +192,6 @@ function TimelineRow({
   prevCompleted: boolean;
 }) {
   const { isDark } = useAppTheme();
-  const router = useRouter();
 
   // A future stage the student hasn't reached yet — grey, locked, no
   // interaction. The stage right after the last completed one ("up next")
@@ -201,7 +200,6 @@ function TimelineRow({
   // Dashboard/Progress timeline already used — no status logic changed.
   const locked = stage.status === 'pending' && !isReached;
   const meta = STATUS_META[stage.status];
-  const stageMeta = getStageMetaByTitle(stage.title);
 
   const fade = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(14)).current;
@@ -238,23 +236,10 @@ function TimelineRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.status, index]);
 
-  const handleOpenChat = () => {
-    if (locked) return;
-    router.push({ pathname: '/group-chat', params: { stage: stageMeta.slug } } as never);
-  };
-
   // Node/icon colors per status — completed/in_progress/pending come from
   // STATUS_META unchanged; "locked" is a purely presentational bucket
   // layered on top of the existing pending status, never a new status value.
   const nodeColor = locked ? (isDark ? '#1e293b' : '#e2e8f0') : stage.status === 'completed' ? GREEN : stage.status === 'in_progress' ? AMBER : isDark ? '#1e293b' : '#e2e8f0';
-  const iconTint = locked
-    ? { bg: isDark ? '#0f172a' : '#f1f5f9', color: isDark ? '#475569' : '#94a3b8' }
-    : stage.status === 'completed'
-      ? { bg: isDark ? 'rgba(34,197,94,0.12)' : '#f0fdf4', color: GREEN }
-      : stage.status === 'in_progress'
-        ? { bg: isDark ? 'rgba(234,179,8,0.14)' : '#fefce8', color: AMBER }
-        : { bg: isDark ? '#112019' : '#f8fafc', color: isDark ? '#94a3b8' : '#64748b' };
-
   const trackColor = isDark ? '#1e293b' : '#e2e8f0';
   const connectorAboveColor = prevCompleted ? GREEN : trackColor;
   const connectorBelowColor = stage.status === 'completed' ? GREEN : trackColor;
@@ -307,84 +292,106 @@ function TimelineRow({
           {!isLast ? <View style={{ width: 2, flex: 1, backgroundColor: connectorBelowColor }} /> : <View style={{ flex: 1 }} />}
         </View>
 
-        <View className="mb-4 ml-2.5 flex-1">
+        <View className="mb-3 ml-2.5 flex-1">
           <View
             style={{
-              borderRadius: 16,
-              overflow: 'hidden',
-              backgroundColor: locked ? (isDark ? '#0a1410' : '#f8fafc') : isDark ? '#112019' : '#ffffff',
+              borderRadius: 14,
+              backgroundColor: isDark ? '#111a2e' : '#ffffff',
               borderWidth: 1,
-              borderColor: locked ? (isDark ? '#1e293b' : '#e2e8f0') : stage.status === 'in_progress' ? (isDark ? 'rgba(234,179,8,0.35)' : '#fde68a') : stage.status === 'completed' ? (isDark ? 'rgba(34,197,94,0.25)' : '#bbf7d0') : isDark ? '#1e293b' : '#e2e8f0',
-              opacity: locked ? 0.7 : 1,
-              shadowColor: '#0f172a',
-              shadowOpacity: isDark ? 0 : 0.04,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 3 },
-              elevation: isDark ? 0 : 1,
+              borderColor: isDark ? '#1e293b' : '#eef2f7',
+              opacity: locked ? 0.55 : 1,
             }}>
-            <View className="flex-row items-center gap-3 px-3 py-3">
-              <View style={{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: iconTint.bg }}>
-                <Ionicons name={locked ? 'lock-closed-outline' : stageMeta.icon} size={17} color={iconTint.color} />
-              </View>
-
+            <View className="flex-row items-start gap-3 px-3.5 pb-1 pt-3">
               <View className="flex-1">
-                <Text
-                  className="text-[14.5px] font-semibold"
-                  style={{ color: locked ? (isDark ? '#64748b' : '#94a3b8') : isDark ? '#ffffff' : '#0f172a' }}>
-                  {stage.title}
-                </Text>
-              </View>
-
-              <View className="items-end">
-                {locked ? (
-                  <Text className="text-[11px] font-medium" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
-                    Locked
-                  </Text>
-                ) : (
-                  <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: meta.badgeBg }}>
-                    <Text className="text-[10.5px] font-semibold" style={{ color: meta.badgeText }}>
-                      {meta.label}
-                    </Text>
-                  </View>
-                )}
+                <Text className="text-[14.5px] font-semibold text-slate-900 dark:text-white">{stage.title}</Text>
                 {!locked && stage.updatedAt ? (
-                  <Text className="mt-1 text-[10px]" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
-                    {formatRelativeShort(stage.updatedAt)}
+                  <Text className="mt-0.5 text-[10.5px]" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+                    Updated {formatRelativeShort(stage.updatedAt)}
                   </Text>
                 ) : null}
               </View>
+              <StatusText
+                label={locked ? 'Locked' : meta.label}
+                color={locked || stage.status === 'pending' ? isDark ? '#64748b' : '#94a3b8' : meta.badgeText}
+              />
             </View>
 
-            {/* Remark preview lives inside the same card, right under the
-                header, separated only by a hairline divider — not a
-                separate floating box below it. Tap opens the full
-                conversation in Group Chat; locked stages get a disabled,
-                divider-only row since there's nothing to discuss yet. */}
-            <Pressable
-              onPress={handleOpenChat}
-              disabled={locked}
-              className="flex-row items-center justify-between gap-2 border-t px-3 py-2.5"
-              style={{
-                minHeight: 44,
-                borderColor: isDark ? 'rgba(148,163,184,0.12)' : '#f1f5f9',
-                backgroundColor: locked ? 'transparent' : isDark ? 'rgba(148,163,184,0.04)' : 'rgba(248,250,252,0.7)',
-              }}>
-              {locked ? (
-                <Text className="flex-1 text-[13px]" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
-                  Remark locked until this stage starts
-                </Text>
-              ) : stage.latestRemark ? (
-                <Text className="flex-1 text-[13px] text-slate-600 dark:text-slate-300">{stage.latestRemark}</Text>
-              ) : (
-                <Text className="flex-1 text-[13px]" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
-                  No remark yet
-                </Text>
-              )}
-              <Ionicons name={locked ? 'lock-closed-outline' : 'chevron-forward'} size={14} color={isDark ? '#64748b' : '#94a3b8'} />
-            </Pressable>
+            {/* Sub-steps, each with its own status (set by staff). A locked
+                step still lists them, faded, so the student sees what's next. */}
+            {stage.substeps?.length ? (
+              <View className="px-3.5 pb-2.5 pt-1">
+                {stage.substeps.map((substep) => {
+                  const subMeta = STATUS_META[substep.tone] ?? STATUS_META.pending;
+                  return (
+                    <View key={substep.key} className="py-1.5">
+                      <View className="flex-row items-center gap-3">
+                        <Text numberOfLines={1} className="flex-1 text-[13px] text-slate-600 dark:text-slate-300">
+                          {substep.title}
+                        </Text>
+                        <StatusText label={substep.statusLabel} color={locked || substep.tone === 'pending' ? isDark ? '#64748b' : '#94a3b8' : subMeta.badgeText}
+                          small
+                        />
+                      </View>
+                      {!locked && substep.remarks?.length ? (
+                        <View className="mt-1 gap-1">
+                          {substep.remarks.map((remark, i) => (
+                            <RemarkQuote key={remark._id ?? `r-${i}`} remark={remark} isDark={isDark} />
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {/* Step remarks — saved on the admin Journey tab (never chat
+                messages). Read-only; only shown once there is one. */}
+            {!locked && (stage.remarks?.length || stage.latestRemark) ? (
+              <View
+                className="gap-1.5 border-t px-3.5 py-2.5"
+                style={{ borderColor: isDark ? 'rgba(148,163,184,0.12)' : '#f1f5f9' }}>
+                {stage.remarks?.length ? (
+                  stage.remarks.map((remark, i) => (
+                    <RemarkQuote key={remark._id ?? `legacy-${i}`} remark={remark} isDark={isDark} />
+                  ))
+                ) : (
+                  <RemarkQuote remark={{ _id: null, text: stage.latestRemark!, byRole: '', createdAt: null }} isDark={isDark} />
+                )}
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
     </Animated.View>
+  );
+}
+
+// A status as coloured dot + text — lighter than a filled pill.
+function StatusText({ label, color, small = false }: { label: string; color: string; small?: boolean }) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+      <Text className={small ? 'text-[11.5px] font-medium' : 'text-[12px] font-semibold'} style={{ color }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// One staff remark as a simple quote: team + time, then the text.
+function RemarkQuote({ remark, isDark }: { remark: JourneyRemark; isDark: boolean }) {
+  return (
+    <View
+      className="pl-2.5"
+      style={{ borderLeftWidth: 2, borderLeftColor: isDark ? 'rgba(148,163,184,0.25)' : '#e2e8f0' }}>
+      <Text className="text-[12.5px] leading-[18px] text-slate-600 dark:text-slate-300">{remark.text}</Text>
+      {remark.byRole || remark.createdAt ? (
+        <Text className="mt-0.5 text-[10.5px]" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+          {remark.byRole || 'WiZdom'}
+          {remark.createdAt ? ` · ${formatRelativeShort(remark.createdAt)}` : ''}
+        </Text>
+      ) : null}
+    </View>
   );
 }

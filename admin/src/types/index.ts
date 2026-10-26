@@ -49,6 +49,13 @@ export type StudentStatus = (typeof STUDENT_STATUSES)[number];
 
 export const PAYMENT_STATUSES = ['Paid in Full', 'Half Payment', 'Free'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+// Display labels — the stored value stays 'Free' so existing records don't
+// need migrating.
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  'Paid in Full': 'Paid in Full',
+  'Half Payment': 'Half Payment',
+  Free: 'Free Payment',
+};
 
 // Denormalized audit snapshot — who created/last updated a student record.
 // Shared shape for both createdBy and updatedBy.
@@ -87,6 +94,7 @@ export interface Student {
   // StudentCard.
   groupName?: string;
   paymentStatus?: PaymentStatus | null;
+  paymentRemark?: string;
   createdBy?: StudentAuditor | null;
   updatedBy?: StudentAuditor | null;
   updatedAt?: string;
@@ -100,10 +108,13 @@ export interface Student {
   lastHandledAt?: string | null;
   journeyCompleted: boolean;
   responseStatus: ResponseStatus;
-  // Raw per-stage progress — used by StudentCard to derive its
-  // pipeline-milestone outline (Documentation/Offer/Visa). Absent stages
+  // Student messages the logged-in staff account hasn't read yet — only
+  // set on the Students list (GET /api/students), not the detail fetch.
+  unreadCount?: number;
+  // Raw per-sub-step progress — used by StudentCard to derive its
+  // pipeline-milestone outline (Documentation/Offer/Visa). Absent sub-steps
   // default to 'pending' server-side, so this can be a sparse/empty array.
-  journey?: JourneyStage[];
+  journey?: JourneyEntry[];
   // LOR/SOP intake notes captured on the SIF tab. Admin-facing only.
   sif?: Sif;
 }
@@ -195,6 +206,20 @@ export interface InternshipRow {
   dateTo: string;
 }
 
+// "Professional Details" answers — the rows live in internshipExperience /
+// industryExperience.
+export interface ProfessionalDetails {
+  hasInternship: '' | 'yes' | 'no';
+  hasIndustryExperience: '' | 'yes' | 'no';
+  industryYears: string;
+}
+
+export const EMPTY_PROFESSIONAL_DETAILS: ProfessionalDetails = {
+  hasInternship: '',
+  hasIndustryExperience: '',
+  industryYears: '',
+};
+
 export interface DocumentChecklistItem {
   key: string;
   name: string;
@@ -235,8 +260,15 @@ export interface Sif {
   personalDetails: PersonalDetails;
   academicQualifications: AcademicQualification[];
   internshipExperience: InternshipRow[];
+  industryExperience: InternshipRow[];
+  professionalDetails: ProfessionalDetails;
+  // Student's answer to "Do you need assistance with your LOR / SOP?" in the app.
+  lorAssistance: '' | 'yes' | 'no';
+  sopAssistance: '' | 'yes' | 'no';
   documentChecklist: DocumentChecklistItem[];
   sop: SopDetails;
+  // Set by the student agreeing in the app — read-only for staff.
+  termsAcceptedAt?: string | null;
   updatedAt?: string | null;
   updatedByName?: string | null;
 }
@@ -316,12 +348,58 @@ export const EMPTY_INTERNSHIP_ROW: InternshipRow = {
 export const buildDefaultDocumentChecklist = (): DocumentChecklistItem[] =>
   DOCUMENT_CHECKLIST_TEMPLATE.map(({ key, name, format }) => ({ key, name, format, ready: '' as const }));
 
+// The colour bucket a status renders with. A sub-step's own status values
+// vary per sub-step ("booked", "loan_sanctioned", ...) — see
+// backend/constants/journeyStages.js; the server sends each sub-step's options.
 export type JourneyStageStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
 
+export interface JourneyStatusOption {
+  value: string;
+  label: string;
+  tone: JourneyStageStatus;
+}
+
+export interface JourneySubstep {
+  // Storage key sent back on update — "Finance / Funds".
+  key: string;
+  title: string;
+  status: string;
+  statusLabel: string;
+  tone: JourneyStageStatus;
+  updatedAt: string | null;
+  options: JourneyStatusOption[];
+  // Staff remarks on this sub-step, oldest first.
+  remarks?: JourneyRemark[];
+}
+
+// One of the 7 journey steps. `status` is derived from its sub-steps.
 export interface JourneyStage {
   title: string;
   status: JourneyStageStatus;
   updatedAt: string | null;
+  substeps: JourneySubstep[];
+  // Staff remarks for this step, oldest first — shown to the student under
+  // the step in the app. Not chat messages.
+  remarks?: JourneyRemark[];
+}
+
+// A raw Student.journey entry as embedded on the student record — a
+// sub-step ("Finance / Funds") with its status, or a step holding remarks.
+export interface JourneyEntry {
+  title: string;
+  status: string;
+  updatedAt: string | null;
+}
+
+export interface JourneyRemark {
+  // null for a legacy remark carried over from before remarks were a list
+  // (can't be deleted individually).
+  _id: string | null;
+  text: string;
+  byId: string | null;
+  byName: string;
+  byRole: string;
+  createdAt: string | null;
 }
 
 export type MessageSender = 'admin' | 'student';
@@ -338,6 +416,8 @@ export interface ChatMessage {
   text: string;
   stage: string | null;
   department: string | null;
+  // Staff @mentioned the student on this message.
+  mentionsStudent?: boolean;
   readByStudent: boolean;
   readByAdmin: boolean;
   // True once every OTHER participant (every other active staff account,

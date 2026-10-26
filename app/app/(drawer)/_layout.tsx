@@ -13,8 +13,8 @@ const UNIVERSITY_COURSES_URL = 'https://studyx.cc';
 // Folder is still named "(drawer)" (a route group, invisible in the URL) —
 // renaming it would mean moving every screen file for a purely cosmetic
 // win. The navigator itself is a bottom tab bar now, not a drawer: Home,
-// Progress, Chats and Courses are the four primary destinations. Profile
-// stays routable (the header avatar on Home/Progress opens it) but isn't a
+// Chats, SIF, LOR, SOP and Courses are the primary destinations. Profile
+// stays routable (the header avatar on Home opens it) but isn't a
 // tab of its own — it would otherwise duplicate that same header shortcut.
 export default function TabsLayout() {
   usePushNotifications();
@@ -22,7 +22,7 @@ export default function TabsLayout() {
   const { isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
 
-  const activeColor = isDark ? '#86c99b' : '#166534';
+  const activeColor = isDark ? '#93c5fd' : '#1d4ed8';
   const inactiveColor = isDark ? '#64748b' : '#94a3b8';
   const barBottomPadding = Math.max(insets.bottom, 10);
 
@@ -44,7 +44,7 @@ export default function TabsLayout() {
   const renderIconWithLabel =
     (iconName: keyof typeof Ionicons.glyphMap, iconNameFocused: keyof typeof Ionicons.glyphMap, label: string) =>
     ({ color, focused }: { color: string; focused: boolean }) => (
-      <View style={{ height: 44, width: 64, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+      <View style={{ height: 44, width: 56, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
         <Ionicons name={focused ? iconNameFocused : iconName} size={22} color={color} />
         <Text allowFontScaling={false} style={{ fontSize: 10.5, fontWeight: '600', color, lineHeight: 13 }} numberOfLines={1}>
           {label}
@@ -91,7 +91,7 @@ export default function TabsLayout() {
           tabBarActiveTintColor: activeColor,
           tabBarInactiveTintColor: inactiveColor,
           tabBarStyle: {
-            backgroundColor: isDark ? '#0a1410' : '#ffffff',
+            backgroundColor: isDark ? '#0a1020' : '#ffffff',
             borderTopWidth: isDark ? 0 : 1,
             borderTopColor: '#eef2f7',
             height: 70 + barBottomPadding,
@@ -114,14 +114,6 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="progress"
-          options={{
-            title: 'Progress',
-            tabBarIcon: renderTab('trending-up-outline', 'trending-up', 'Progress'),
-            tabBarLabel: renderLabel('Progress'),
-          }}
-        />
-        <Tabs.Screen
           name="group-chat"
           options={{
             title: 'Chats',
@@ -136,6 +128,22 @@ export default function TabsLayout() {
             title: 'SIF',
             tabBarIcon: renderTab('clipboard-outline', 'clipboard', 'SIF'),
             tabBarLabel: renderLabel('SIF'),
+          }}
+        />
+        <Tabs.Screen
+          name="lor"
+          options={{
+            title: 'LOR',
+            tabBarIcon: renderTab('ribbon-outline', 'ribbon', 'LOR'),
+            tabBarLabel: renderLabel('LOR'),
+          }}
+        />
+        <Tabs.Screen
+          name="sop"
+          options={{
+            title: 'SOP',
+            tabBarIcon: renderTab('document-text-outline', 'document-text', 'SOP'),
+            tabBarLabel: renderLabel('SOP'),
           }}
         />
         <Tabs.Screen
@@ -158,6 +166,7 @@ export default function TabsLayout() {
 
         {/* Reachable via router.push, hidden from the tab bar itself. */}
         <Tabs.Screen name="profile" options={{ href: null }} />
+        <Tabs.Screen name="progress" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
         <Tabs.Screen name="documents" options={{ href: null }} />

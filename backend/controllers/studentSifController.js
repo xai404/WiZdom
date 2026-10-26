@@ -1,8 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const Student = require('../models/Student');
 const ApiError = require('../utils/ApiError');
-const { sanitizeSif } = require('../utils/sifPayload');
+const { mergeSif } = require('../utils/sifPayload');
 const { syncInterestFormFromCrm } = require('../utils/crmSif');
+const { announceSifSubmissions } = require('../utils/sifSubmissions');
 
 // @desc    Get the signed-in student's own Student Information Form — the
 //          study-preference block auto-filled from the CRM Student Interest
@@ -21,8 +22,8 @@ const getMySif = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, sif: student.sif });
 });
 
-// @desc    Replace the signed-in student's own SIF. Whole-object replace
-//          (not a merge) — the app always sends the complete form.
+// @desc    Update the signed-in student's own SIF. Section-level merge — the
+//          app's SIF, LOR and SOP tabs each send only their own sections.
 // @route   PUT /api/student/sif
 // @access  Private/Student
 const updateMySif = asyncHandler(async (req, res) => {
@@ -32,8 +33,16 @@ const updateMySif = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Your account has been closed. Please contact your counsellor.');
   }
 
-  student.sif = sanitizeSif(req.body.sif ?? req.body, student.name);
+  student.sif = mergeSif(student.sif, req.body.sif ?? req.body, student.name, { allowTermsAcceptance: true });
   await student.save({ validateModifiedOnly: true });
+
+  // First save that completes the SIF / LOR / SOP posts a pinned chat
+  // message for staff. Never fails the save itself.
+  try {
+    await announceSifSubmissions(student);
+  } catch (err) {
+    console.error(`[sif] submission announcement student=${student._id} failed:`, err);
+  }
 
   res.status(200).json({ success: true, sif: student.sif });
 });

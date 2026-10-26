@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Milestone, MessageCircle, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Milestone, MessageCircle, ClipboardList, Award, FileText } from 'lucide-react';
 import { Avatar, Tabs } from '../ui';
 import type { TabItem } from '../ui';
-import { fetchStudentById, fetchStudentChat, fetchStudentJourney, postStudentChatMessage, updateStudentJourneyStage } from '../../api/students';
+import {
+  fetchStudentById,
+  fetchStudentChat,
+  fetchStudentJourney,
+  addStudentJourneyRemark,
+  deleteStudentJourneyRemark,
+  updateStudentJourneyStage,
+} from '../../api/students';
 import JourneyTab from './JourneyTab';
 import ChatTab from './ChatTab';
 import StudentInfoTab from './StudentInfoTab';
-import type { ChatMessage, JourneyStage, JourneyStageStatus, Student } from '../../types';
+import type { ChatMessage, JourneyStage, Student } from '../../types';
 
 const TABS: TabItem[] = [
-  { key: 'journey', label: 'Journey', icon: <Milestone size={15} /> },
   { key: 'chats', label: 'Chats', icon: <MessageCircle size={15} /> },
+  { key: 'journey', label: 'Journey', icon: <Milestone size={15} /> },
   { key: 'sif', label: 'SIF', icon: <ClipboardList size={15} /> },
+  { key: 'lor', label: 'LOR', icon: <Award size={15} /> },
+  { key: 'sop', label: 'SOP', icon: <FileText size={15} /> },
 ];
 
 interface StudentDetailPanelProps {
@@ -26,7 +35,15 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('journey');
+  const [activeTab, setActiveTab] = useState('chats');
+
+  // Clicking a student in the list always lands on their chat — the panel
+  // stays mounted across students, so reset rather than keep the last tab.
+  const [tabStudentId, setTabStudentId] = useState(studentId);
+  if (tabStudentId !== studentId) {
+    setTabStudentId(studentId);
+    setActiveTab('chats');
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -54,10 +71,10 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
     onStudentUpdated(s);
   };
 
-  // Opening the SIF tab re-pulls the student so the LOR/SOP the student
+  // Opening the SIF / LOR / SOP tab re-pulls the student so whatever they
   // filled in on the app shows up even if this panel was opened earlier.
   useEffect(() => {
-    if (activeTab !== 'sif') return;
+    if (activeTab !== 'sif' && activeTab !== 'lor' && activeTab !== 'sop') return;
     fetchStudentById(studentId)
       .then((s) => {
         setStudent(s);
@@ -66,18 +83,6 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, studentId]);
-
-  const remarksByStage = useMemo(() => {
-    const map = new Map<string, ChatMessage>();
-    for (const msg of messages) {
-      if (!msg.stage) continue;
-      const existing = map.get(msg.stage);
-      if (!existing || new Date(msg.createdAt) > new Date(existing.createdAt)) {
-        map.set(msg.stage, msg);
-      }
-    }
-    return map;
-  }, [messages]);
 
   const currentStage = useMemo(
     () => journey.find((s) => s.status !== 'completed')?.title ?? journey[journey.length - 1]?.title ?? '',
@@ -101,9 +106,11 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-4">
-      <div className="flex shrink-0 flex-col gap-3">
-        <div className="flex items-center gap-2.5">
+    <div className="flex h-full min-h-0 w-full flex-col gap-2">
+      {/* Name + tabs share one row when there's room (wraps when narrow) so
+          the chat below gets as much height as possible. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2.5">
           <button onClick={onBack} className="shrink-0 text-slate-400 hover:text-slate-600">
             <ArrowLeft size={20} />
           </button>
@@ -112,7 +119,7 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
           <Avatar
             name={student.groupName?.trim() || student.name}
             src={student.profilePicture}
-            size={36}
+            size={32}
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-800">
@@ -125,13 +132,14 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
             )}
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto">
           <Tabs
             tabs={TABS}
             active={activeTab}
             onChange={setActiveTab}
             layoutId="student-detail-tab"
             className="shrink-0"
+            size="sm"
           />
         </div>
       </div>
@@ -140,28 +148,33 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
         {activeTab === 'journey' ? (
           <div className="h-full overflow-y-auto pr-1">
             <JourneyTab
+              // Re-open the new student's current step when switching students.
+              key={student.id}
               journey={journey}
-              remarksByStage={remarksByStage}
               isClosed={student.status === 'Closed'}
-              onStatusChange={async (title, status: JourneyStageStatus) => {
-                await updateStudentJourneyStage(student.id, title, status);
+              onStatusChange={async (substepKey, status) => {
+                await updateStudentJourneyStage(student.id, substepKey, status);
                 const j = await fetchStudentJourney(student.id);
                 setJourney(j);
                 await refreshStudent();
               }}
-              onPostRemark={async (title, text) => {
-                await postStudentChatMessage(student.id, text, title);
-                const m = await fetchStudentChat(student.id);
-                setMessages(m);
+              onAddRemark={async (title, text) => {
+                await addStudentJourneyRemark(student.id, title, text);
+                setJourney(await fetchStudentJourney(student.id));
+              }}
+              onDeleteRemark={async (remarkId) => {
+                await deleteStudentJourneyRemark(student.id, remarkId);
+                setJourney(await fetchStudentJourney(student.id));
               }}
             />
           </div>
-        ) : activeTab === 'sif' ? (
+        ) : activeTab === 'sif' || activeTab === 'lor' || activeTab === 'sop' ? (
           <StudentInfoTab
-            // Remount (and re-seed the form) whenever the student changes or
-            // their SIF was updated server-side — e.g. the student just
-            // saved it from the app.
-            key={`${student.id}:${student.sif?.updatedAt ?? 'none'}`}
+            // Remount (and re-seed the form) whenever the student, the view,
+            // or their SIF changes server-side — e.g. the student just saved
+            // it from the app.
+            key={`${student.id}:${activeTab}:${student.sif?.updatedAt ?? 'none'}`}
+            view={activeTab}
             student={student}
             onStudentUpdated={(s) => {
               setStudent(s);
@@ -171,6 +184,7 @@ const StudentDetailPanel = ({ studentId, onBack, onStudentUpdated }: StudentDeta
         ) : (
           <ChatTab
             studentId={student.id}
+            studentName={student.name}
             stages={journey.map((j) => j.title)}
             currentStage={currentStage}
             responsibleDepartment={student.responsibleDepartment ?? null}

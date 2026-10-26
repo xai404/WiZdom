@@ -1,6 +1,6 @@
 import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, CalendarClock, Check, FileText, FolderOpen, GraduationCap, IdCard, Pencil, Plus, Save, Trash2, UserCheck, X } from 'lucide-react';
+import { Briefcase, CalendarClock, Check, FileText, FolderOpen, GraduationCap, IdCard, Pencil, Plus, Save, ShieldCheck, Trash2, UserCheck, X } from 'lucide-react';
 import { Badge, Button, Input, Select, STUDENT_STATUS_TONE } from '../ui';
 import { updateStudent } from '../../api/students';
 import { formatIntakeBadge } from '../../utils/countryFlags';
@@ -12,6 +12,7 @@ import {
   EMPTY_INTERNSHIP_ROW,
   EMPTY_LOR_RECOMMENDER,
   EMPTY_PERSONAL_DETAILS,
+  EMPTY_PROFESSIONAL_DETAILS,
   EMPTY_SOP,
   type AcademicQualification,
   type DocumentChecklistItem,
@@ -19,6 +20,7 @@ import {
   type InternshipRow,
   type LorRecommender,
   type PersonalDetails,
+  type ProfessionalDetails,
   type SopDetails,
   type Student,
 } from '../../types';
@@ -33,8 +35,7 @@ type AcademicField =
   | 'yearOfPassing'
   | 'percentage'
   | 'backlogs'
-  | 'schoolCollegeName'
-  | 'boardUniversity';
+  | 'schoolCollegeName';
 
 const fmtDateTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : null;
@@ -164,14 +165,28 @@ const buildSopRows = (s: SopDetails): [string, string][] => [
 ];
 
 const buildInternshipRows = (r: InternshipRow): [string, string][] => [
-  ['Name of Employer', r.nameOfEmployer],
-  ['Address of Employer', r.addressOfEmployer],
-  ['Your Designation', r.designation],
-  ['Salary (Monthly)', r.salaryMonthly],
-  ['Date From', r.dateFrom],
-  ['Date To', r.dateTo],
+  ['Name of the Company', r.nameOfEmployer],
+  ['Designation', r.designation],
+  ['Working From', r.dateFrom],
+  ['Working To', r.dateTo],
 ];
 
+
+// "Does the student need help with their LOR / SOP?" — answered in the app.
+const AssistanceNote = ({ answer, what }: { answer?: '' | 'yes' | 'no'; what: 'LOR' | 'SOP' }) => (
+  <div
+    className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm shadow-(--shadow-soft) ${
+      answer === 'yes'
+        ? 'border-brand-100 bg-brand-50 text-brand-700'
+        : answer === 'no'
+          ? 'border-slate-200 bg-slate-50 text-slate-600'
+          : 'border-amber-100 bg-amber-50 text-amber-700'
+    }`}
+  >
+    <span className="font-medium">Needs assistance with {what}:</span>
+    <span className="font-semibold">{answer === 'yes' ? 'Yes' : answer === 'no' ? 'No' : 'Not answered yet'}</span>
+  </div>
+);
 
 const SectionTitle = ({ icon, children }: { icon: ReactNode; children: ReactNode }) => (
   <div className="flex items-center gap-2">
@@ -180,13 +195,76 @@ const SectionTitle = ({ icon, children }: { icon: ReactNode; children: ReactNode
   </div>
 );
 
+const ExperienceRows = ({
+  itemLabel,
+  rows,
+  editing,
+  onChange,
+  emptyText,
+  addLabel,
+}: {
+  itemLabel: string;
+  rows: InternshipRow[];
+  editing: boolean;
+  onChange: (rows: InternshipRow[]) => void;
+  emptyText: string;
+  addLabel: string;
+}) => {
+  const setRow = (i: number, patch: Partial<InternshipRow>) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const removeRow = (i: number) =>
+    onChange(rows.length === 1 ? [{ ...EMPTY_INTERNSHIP_ROW }] : rows.filter((_, idx) => idx !== i));
+  const filled = rows.filter((r) => Object.values(r).some((v) => v.trim()));
+
+  return (
+    <div className="space-y-3">
+      {editing ? (
+        <>
+          {rows.map((row, i) => (
+            <div key={i} className="rounded-2xl border border-brand-100 bg-white p-4 shadow-(--shadow-soft)">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+                  {itemLabel} {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 size={13} />
+                  Remove
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input label="Name of the Company" value={row.nameOfEmployer} onChange={(e) => setRow(i, { nameOfEmployer: e.target.value })} />
+                <Input label="Designation" value={row.designation} onChange={(e) => setRow(i, { designation: e.target.value })} />
+                <Input label="Working From" type="date" value={row.dateFrom} onChange={(e) => setRow(i, { dateFrom: e.target.value })} />
+                <Input label="Working To" type="date" value={row.dateTo} onChange={(e) => setRow(i, { dateTo: e.target.value })} />
+              </div>
+            </div>
+          ))}
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => onChange([...rows, { ...EMPTY_INTERNSHIP_ROW }])}>
+            {addLabel}
+          </Button>
+        </>
+      ) : filled.length ? (
+        filled.map((r, i) => <DocCard key={i} title={`${itemLabel} ${i + 1}`} rows={buildInternshipRows(r)} />)
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400 shadow-(--shadow-soft)">
+          {emptyText}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 const ACADEMIC_COLUMNS: [AcademicField, string][] = [
   ['specializationSubjects', 'Specialization / Subjects'],
   ['yearOfPassing', 'Year of Passing'],
   ['percentage', 'Percentage (%)'],
   ['backlogs', 'Backlogs (if any)'],
   ['schoolCollegeName', 'School / College Name'],
-  ['boardUniversity', 'Board / University'],
 ];
 
 const cellInput =
@@ -257,12 +335,25 @@ const AcademicTable = ({
   </div>
 );
 
+export type SifView = 'sif' | 'lor' | 'sop';
+
+// The SIF, LOR and SOP tabs of the student panel all render this component
+// with a different `view` — same record, same Edit/Save gate, but each tab
+// shows and saves only its own sections (the server merges sections).
+const VIEW_META: Record<SifView, { title: string; short: string }> = {
+  sif: { title: 'Student Information Form', short: 'SIF' },
+  lor: { title: 'Letter of Recommendation (LOR)', short: 'LOR' },
+  sop: { title: 'Statement of Purpose (SOP)', short: 'SOP' },
+};
+
 interface StudentInfoTabProps {
   student: Student;
   onStudentUpdated: (student: Student) => void;
+  view?: SifView;
 }
 
-const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
+const StudentInfoTab = ({ student, onStudentUpdated, view = 'sif' }: StudentInfoTabProps) => {
+  const meta = VIEW_META[view];
   const navigate = useNavigate();
 
   const readInitial = () => ({
@@ -276,6 +367,19 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
     internships: student.sif?.internshipExperience?.length
       ? student.sif.internshipExperience
       : [{ ...EMPTY_INTERNSHIP_ROW }],
+    industry: student.sif?.industryExperience?.length
+      ? student.sif.industryExperience
+      : [{ ...EMPTY_INTERNSHIP_ROW }],
+    // Older records have rows but no Yes/No answer yet — treat as "Yes".
+    professional: {
+      ...EMPTY_PROFESSIONAL_DETAILS,
+      ...(student.sif?.professionalDetails ?? {}),
+      hasInternship:
+        student.sif?.professionalDetails?.hasInternship || (student.sif?.internshipExperience?.length ? 'yes' : ''),
+      hasIndustryExperience:
+        student.sif?.professionalDetails?.hasIndustryExperience ||
+        (student.sif?.industryExperience?.length ? 'yes' : ''),
+    } as ProfessionalDetails,
     documents: student.sif?.documentChecklist?.length
       ? student.sif.documentChecklist
       : buildDefaultDocumentChecklist(),
@@ -287,6 +391,8 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
   const [personal, setPersonal] = useState<PersonalDetails>(init.personal);
   const [academics, setAcademics] = useState<AcademicQualification[]>(init.academics);
   const [internships, setInternships] = useState<InternshipRow[]>(init.internships);
+  const [industry, setIndustry] = useState<InternshipRow[]>(init.industry);
+  const [professional, setProfessional] = useState<ProfessionalDetails>(init.professional);
   const [documents, setDocuments] = useState<DocumentChecklistItem[]>(init.documents);
   const [interestForm, setInterestForm] = useState<InterestForm>(init.interestForm);
 
@@ -297,9 +403,10 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
   const [justSaved, setJustSaved] = useState(false);
   const [savedAt, setSavedAt] = useState(student.sif?.updatedAt ?? null);
   const [savedBy, setSavedBy] = useState(student.sif?.updatedByName ?? null);
+  const termsAcceptedAt = student.sif?.termsAcceptedAt ?? null;
 
   const snapshot = () =>
-    JSON.stringify({ lor, interestForm, personal, academics, internships, documents, sop });
+    JSON.stringify({ lor, interestForm, personal, academics, internships, industry, professional, documents, sop });
   const baselineRef = useRef(snapshot());
   const dirty = snapshot() !== baselineRef.current;
 
@@ -307,11 +414,6 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
   const setPersonalField = (patch: Partial<PersonalDetails>) => setPersonal((prev) => ({ ...prev, ...patch }));
   const setAcademicRow = (i: number, patch: Partial<AcademicQualification>) =>
     setAcademics((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const setInternshipRow = (i: number, patch: Partial<InternshipRow>) =>
-    setInternships((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const addInternship = () => setInternships((prev) => [...prev, { ...EMPTY_INTERNSHIP_ROW }]);
-  const removeInternship = (i: number) =>
-    setInternships((prev) => (prev.length === 1 ? [{ ...EMPTY_INTERNSHIP_ROW }] : prev.filter((_, idx) => idx !== i)));
   const setDocReady = (key: string, ready: DocumentChecklistItem['ready']) =>
     setDocuments((prev) => prev.map((d) => (d.key === key ? { ...d, ready } : d)));
   const setRecommender = (i: number, patch: Partial<LorRecommender>) =>
@@ -320,6 +422,8 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
   const removeRecommender = (i: number) =>
     setLor((prev) => (prev.length === 1 ? [{ ...EMPTY_LOR_RECOMMENDER }] : prev.filter((_, idx) => idx !== i)));
   const setSopField = (patch: Partial<SopDetails>) => setSop((prev) => ({ ...prev, ...patch }));
+  const setProfessionalField = (patch: Partial<ProfessionalDetails>) =>
+    setProfessional((prev) => ({ ...prev, ...patch }));
 
   const cancelEdit = () => {
     const next = readInitial();
@@ -329,6 +433,8 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
     setPersonal(next.personal);
     setAcademics(next.academics);
     setInternships(next.internships);
+    setIndustry(next.industry);
+    setProfessional(next.professional);
     setDocuments(next.documents);
     setError('');
     setEditing(false);
@@ -339,18 +445,25 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
     setError('');
     try {
       const cleanedLor = lor.filter((r) => Object.values(r).some((v) => v.trim()));
-      const cleanedInternships = internships.filter((r) => Object.values(r).some((v) => v.trim()));
-      const updated = await updateStudent(student.id, {
-        sif: {
-          lor: cleanedLor,
-          interestForm,
-          personalDetails: personal,
-          academicQualifications: academics,
-          internshipExperience: cleanedInternships,
-          documentChecklist: documents,
-          sop,
-        },
-      });
+      const hasText = (r: InternshipRow) => Object.values(r).some((v) => v.trim());
+      const sifPatch =
+        view === 'lor'
+          ? { lor: cleanedLor }
+          : view === 'sop'
+            ? { sop }
+            : {
+                interestForm,
+                personalDetails: personal,
+                academicQualifications: academics,
+                internshipExperience: professional.hasInternship === 'yes' ? internships.filter(hasText) : [],
+                industryExperience: professional.hasIndustryExperience === 'yes' ? industry.filter(hasText) : [],
+                professionalDetails: {
+                  ...professional,
+                  industryYears: professional.hasIndustryExperience === 'yes' ? professional.industryYears.trim() : '',
+                },
+                documentChecklist: documents,
+              };
+      const updated = await updateStudent(student.id, { sif: sifPatch });
       onStudentUpdated(updated);
       const nextLor = updated.sif?.lor?.length ? updated.sif.lor : [{ ...EMPTY_LOR_RECOMMENDER }];
       const nextSop = updated.sif?.sop ?? { ...EMPTY_SOP };
@@ -362,6 +475,10 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
       const nextInternships = updated.sif?.internshipExperience?.length
         ? updated.sif.internshipExperience
         : [{ ...EMPTY_INTERNSHIP_ROW }];
+      const nextIndustry = updated.sif?.industryExperience?.length
+        ? updated.sif.industryExperience
+        : [{ ...EMPTY_INTERNSHIP_ROW }];
+      const nextProfessional = { ...EMPTY_PROFESSIONAL_DETAILS, ...(updated.sif?.professionalDetails ?? {}) };
       const nextDocuments = updated.sif?.documentChecklist?.length
         ? updated.sif.documentChecklist
         : buildDefaultDocumentChecklist();
@@ -371,6 +488,8 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
       setPersonal(nextPersonal);
       setAcademics(nextAcademics);
       setInternships(nextInternships);
+      setIndustry(nextIndustry);
+      setProfessional(nextProfessional);
       setDocuments(nextDocuments);
       setEditing(false);
       baselineRef.current = JSON.stringify({
@@ -379,6 +498,8 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
         personal: nextPersonal,
         academics: nextAcademics,
         internships: nextInternships,
+        industry: nextIndustry,
+        professional: nextProfessional,
         documents: nextDocuments,
         sop: nextSop,
       });
@@ -387,7 +508,7 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Could not save the SIF.');
+      setError(err?.response?.data?.message || `Could not save the ${meta.short}.`);
     } finally {
       setSaving(false);
     }
@@ -433,10 +554,10 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
         {/* SIF header — one Edit gate for the whole form */}
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-white px-4 py-3 shadow-(--shadow-soft)">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800">Student Information Form</p>
+            <p className="text-sm font-semibold text-slate-800">{meta.title}</p>
             <p className="text-xs text-slate-400">
               {editing
-                ? 'Editing — remember to Save SIF below.'
+                ? `Editing — remember to Save ${meta.short} below.`
                 : savedLine
                   ? `Last saved ${savedLine}${savedBy ? ` · ${savedBy}` : ''}`
                   : 'Read-only view'}
@@ -448,11 +569,13 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
             </Button>
           ) : (
             <Button size="sm" icon={<Pencil size={14} />} onClick={() => setEditing(true)}>
-              Edit SIF
+              Edit {meta.short}
             </Button>
           )}
         </div>
 
+        {view === 'sif' && (
+        <>
         {/* ---- Student Interest Form (auto-filled from the CRM) ---- */}
         <div className="space-y-3">
           <SectionTitle icon={<IdCard size={16} className="text-brand-600" />}>Student Interest Form</SectionTitle>
@@ -552,56 +675,92 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
           <AcademicTable rows={academics} editing={editing} onCell={setAcademicRow} />
         </div>
 
-        {/* ---- Internship / Industry Experience ---- */}
+        {/* ---- Professional Details ---- */}
         <div className="space-y-3">
-          <SectionTitle icon={<Briefcase size={16} className="text-brand-600" />}>
-            Internship / Industry Experience
-          </SectionTitle>
-          {editing ? (
+          <SectionTitle icon={<Briefcase size={16} className="text-brand-600" />}>Professional Details</SectionTitle>
+
+          {/* Internship */}
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-white px-4 py-3 shadow-(--shadow-soft)">
+            <span className="text-sm font-medium text-slate-700">Has the student done any internship?</span>
+            {editing ? (
+              <div className="w-28 shrink-0">
+                <Select
+                  value={professional.hasInternship}
+                  onChange={(e) => setProfessionalField({ hasInternship: e.target.value as ProfessionalDetails['hasInternship'] })}
+                >
+                  <option value="">—</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </div>
+            ) : (
+              <span className="text-sm font-semibold text-slate-800">{yesNo(professional.hasInternship) || '—'}</span>
+            )}
+          </div>
+          {professional.hasInternship === 'yes' && (
+            <ExperienceRows
+              itemLabel="Internship"
+              rows={internships}
+              editing={editing}
+              onChange={setInternships}
+              emptyText="No internship details added."
+              addLabel="Add another internship"
+            />
+          )}
+
+          {/* Industry experience */}
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-white px-4 py-3 shadow-(--shadow-soft)">
+            <span className="text-sm font-medium text-slate-700">Does the student have industry experience?</span>
+            {editing ? (
+              <div className="w-28 shrink-0">
+                <Select
+                  value={professional.hasIndustryExperience}
+                  onChange={(e) =>
+                    setProfessionalField({ hasIndustryExperience: e.target.value as ProfessionalDetails['hasIndustryExperience'] })
+                  }
+                >
+                  <option value="">—</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </div>
+            ) : (
+              <span className="text-sm font-semibold text-slate-800">{yesNo(professional.hasIndustryExperience) || '—'}</span>
+            )}
+          </div>
+          {professional.hasIndustryExperience === 'yes' && (
             <>
-              {internships.map((row, i) => (
-                <div key={i} className="rounded-2xl border border-brand-100 bg-white p-4 shadow-(--shadow-soft)">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-700">Experience {i + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeInternship(i)}
-                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 size={13} />
-                      Remove
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Input label="Name of Employer" value={row.nameOfEmployer} onChange={(e) => setInternshipRow(i, { nameOfEmployer: e.target.value })} />
-                    <Input label="Your Designation" value={row.designation} onChange={(e) => setInternshipRow(i, { designation: e.target.value })} />
-                    <Input label="Salary (Monthly)" value={row.salaryMonthly} onChange={(e) => setInternshipRow(i, { salaryMonthly: e.target.value })} />
-                    <div className="hidden sm:block" />
-                    <Input label="Date From" type="date" value={row.dateFrom} onChange={(e) => setInternshipRow(i, { dateFrom: e.target.value })} />
-                    <Input label="Date To" type="date" value={row.dateTo} onChange={(e) => setInternshipRow(i, { dateTo: e.target.value })} />
-                    <div className="sm:col-span-2">
-                      <Area label="Address of Employer" value={row.addressOfEmployer} onChange={(v) => setInternshipRow(i, { addressOfEmployer: v })} />
-                    </div>
-                  </div>
+              <ExperienceRows
+                itemLabel="Company"
+                rows={industry}
+                editing={editing}
+                onChange={setIndustry}
+                emptyText="No company details added."
+                addLabel="Add another company"
+              />
+              {editing ? (
+                <div className="max-w-xs">
+                  <Input
+                    label="Years of Experience"
+                    placeholder="e.g. 2 or 1.5"
+                    value={professional.industryYears}
+                    onChange={(e) => setProfessionalField({ industryYears: e.target.value })}
+                  />
                 </div>
-              ))}
-              <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={addInternship}>
-                Add another experience
-              </Button>
+              ) : (
+                <DocCard rows={[['Years of Experience', professional.industryYears]]} />
+              )}
             </>
-          ) : internships.some((r) => Object.values(r).some((v) => v.trim())) ? (
-            internships
-              .filter((r) => Object.values(r).some((v) => v.trim()))
-              .map((r, i) => <DocCard key={i} title={`Experience ${i + 1}`} rows={buildInternshipRows(r)} />)
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400 shadow-(--shadow-soft)">
-              No work experience recorded.
-            </div>
           )}
         </div>
 
+        </>
+        )}
+
         {/* ---- LOR ---- */}
+        {view === 'lor' && (
         <div className="space-y-3">
+          <AssistanceNote answer={student.sif?.lorAssistance} what="LOR" />
           <SectionTitle icon={<GraduationCap size={16} className="text-brand-600" />}>
             Details Required for Letter of Recommendation (LOR)
           </SectionTitle>
@@ -655,8 +814,12 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
           )}
         </div>
 
+        )}
+
         {/* ---- SOP ---- */}
+        {view === 'sop' && (
         <div className="space-y-3">
+          <AssistanceNote answer={student.sif?.sopAssistance} what="SOP" />
           <SectionTitle icon={<FileText size={16} className="text-brand-600" />}>
             Details Required for Statement of Purpose (SOP)
           </SectionTitle>
@@ -693,6 +856,10 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
           )}
         </div>
 
+        )}
+
+        {view === 'sif' && (
+        <>
         {/* ---- Documents Ready With You ---- */}
         <div className="space-y-3">
           <SectionTitle icon={<FolderOpen size={16} className="text-brand-600" />}>Documents Ready With You</SectionTitle>
@@ -747,6 +914,23 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
             })}
           </div>
         </div>
+
+        {/* ---- Terms & Conditions (accepted by the student in the app) ---- */}
+        <div className="space-y-3">
+          <SectionTitle icon={<ShieldCheck size={16} className="text-brand-600" />}>Terms &amp; Conditions</SectionTitle>
+          <div
+            className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm shadow-(--shadow-soft) ${
+              termsAcceptedAt ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'
+            }`}
+          >
+            {termsAcceptedAt ? <Check size={15} /> : <CalendarClock size={15} />}
+            {termsAcceptedAt
+              ? `Student agreed on ${fmtDateTime(termsAcceptedAt)}`
+              : 'Not yet agreed — the student accepts these from the SIF tab in the app.'}
+          </div>
+        </div>
+        </>
+        )}
       </div>
 
       {/* Save bar — only while editing */}
@@ -756,7 +940,7 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
           {justSaved && (
             <p className="mb-2 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
               <Check size={13} />
-              SIF saved successfully
+              {meta.short} saved successfully
             </p>
           )}
           <div className="flex items-center justify-between gap-3">
@@ -766,7 +950,7 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
                 Cancel
               </Button>
               <Button size="sm" icon={<Save size={14} />} loading={saving} disabled={!dirty} onClick={handleSave}>
-                Save SIF
+                Save {meta.short}
               </Button>
             </div>
           </div>
@@ -778,7 +962,7 @@ const StudentInfoTab = ({ student, onStudentUpdated }: StudentInfoTabProps) => {
         <div className="shrink-0 border-t border-slate-100 pt-3">
           <p className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             <Check size={13} />
-            SIF saved successfully
+            {meta.short} saved successfully
           </p>
         </div>
       )}

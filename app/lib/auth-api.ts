@@ -111,26 +111,53 @@ export async function loginRequest(email: string, password: string): Promise<Log
   return data as LoginResponse;
 }
 
-// Student-initiated password reset (see the "Reset Password" row on the
-// Profile screen) — generates and sets a brand new random password for the
-// signed-in student, emails it to them, and returns it once so the app can
-// show it immediately even if the email hasn't arrived yet.
-export async function resetMyPassword(token: string): Promise<string> {
+async function postJson(path: string, body: unknown, fallbackMessage: string, token?: string) {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/student/reset-password`, {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
     });
   } catch {
     throw new Error('Unable to reach the server. Check your connection and try again.');
   }
 
   const data = await response.json().catch(() => null);
-
   if (!response.ok || !data?.success) {
-    throw new Error(data?.message || 'Could not reset your password. Please try again.');
+    throw new Error(data?.message || fallbackMessage);
   }
+  return data;
+}
 
+// Forgot password, step 1 — the email must belong to an existing account;
+// the server emails a 6-digit verification code to it.
+export async function requestPasswordResetOtp(email: string): Promise<string> {
+  const data = await postJson('/api/auth/forgot-password', { email }, 'Could not send the verification code.');
+  return data.message as string;
+}
+
+// Forgot password, step 2 — verifies the code; the server then generates a
+// new password, emails it, and returns it once so the app can show it.
+export async function verifyPasswordResetOtp(email: string, otp: string): Promise<string> {
+  const data = await postJson('/api/auth/verify-reset-otp', { email, otp }, 'Could not verify the code.');
   return data.password as string;
+}
+
+// Profile → Change Password: old password + new password (+ confirm).
+export async function changeMyPassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<void> {
+  await postJson(
+    '/api/student/change-password',
+    { currentPassword, newPassword, confirmPassword },
+    'Could not change your password. Please try again.',
+    token
+  );
 }

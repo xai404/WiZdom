@@ -84,6 +84,20 @@ function sanitizeInternshipExperience(raw) {
   }));
 }
 
+const yesNoBlank = (v) => {
+  const x = str(v).toLowerCase();
+  return x === 'yes' || x === 'no' ? x : '';
+};
+
+function sanitizeProfessionalDetails(raw) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  return {
+    hasInternship: yesNoBlank(input.hasInternship),
+    hasIndustryExperience: yesNoBlank(input.hasIndustryExperience),
+    industryYears: str(input.industryYears),
+  };
+}
+
 function sanitizeDocumentChecklist(raw) {
   const list = Array.isArray(raw) ? raw : [];
   return list.slice(0, MAX_DOCUMENT_ROWS).map((r) => {
@@ -117,6 +131,10 @@ function sanitizeSif(raw, updatedByName) {
     personalDetails: sanitizePersonalDetails(input.personalDetails),
     academicQualifications: sanitizeAcademicQualifications(input.academicQualifications),
     internshipExperience: sanitizeInternshipExperience(input.internshipExperience),
+    industryExperience: sanitizeInternshipExperience(input.industryExperience),
+    professionalDetails: sanitizeProfessionalDetails(input.professionalDetails),
+    lorAssistance: yesNoBlank(input.lorAssistance),
+    sopAssistance: yesNoBlank(input.sopAssistance),
     documentChecklist: sanitizeDocumentChecklist(input.documentChecklist),
     sop: {
       courseName: str(sop.courseName),
@@ -130,4 +148,44 @@ function sanitizeSif(raw, updatedByName) {
   };
 }
 
-module.exports = { sanitizeSif };
+const SIF_SECTIONS = [
+  'lor',
+  'interestForm',
+  'personalDetails',
+  'academicQualifications',
+  'internshipExperience',
+  'industryExperience',
+  'professionalDetails',
+  'lorAssistance',
+  'sopAssistance',
+  'documentChecklist',
+  'sop',
+];
+
+// Section-level merge: only the sections present in `raw` are replaced, the
+// rest are kept from `existing`. The student app saves SIF, LOR and SOP from
+// separate tabs, so a whole-object replace from one tab would wipe what
+// another tab saved. `termsAcceptedAt` is never taken from the payload —
+// only `allowTermsAcceptance` callers (the student's own endpoint) can set
+// it, once, via `termsAccepted: true`.
+function mergeSif(existing, raw, updatedByName, { allowTermsAcceptance = false } = {}) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const prev = existing && typeof existing.toObject === 'function' ? existing.toObject() : existing || {};
+  const sanitized = sanitizeSif(input, updatedByName);
+
+  const merged = {};
+  for (const key of SIF_SECTIONS) {
+    merged[key] = Object.prototype.hasOwnProperty.call(input, key) ? sanitized[key] : prev[key];
+  }
+  merged.termsAcceptedAt = prev.termsAcceptedAt || null;
+  // Server-owned (utils/sifSubmissions) — never taken from the payload.
+  merged.submittedAt = prev.submittedAt || {};
+  if (allowTermsAcceptance && input.termsAccepted === true && !merged.termsAcceptedAt) {
+    merged.termsAcceptedAt = new Date();
+  }
+  merged.updatedAt = sanitized.updatedAt;
+  merged.updatedByName = sanitized.updatedByName;
+  return merged;
+}
+
+module.exports = { sanitizeSif, mergeSif };

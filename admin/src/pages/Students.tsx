@@ -10,7 +10,7 @@ const Students = () => {
   const id = (location.state as { id?: string } | null)?.id;
 
   return (
-    <DashboardLayout>
+    <DashboardLayout fullscreen>
       <StudentsWorkspace selectedId={id ?? null} />
     </DashboardLayout>
   );

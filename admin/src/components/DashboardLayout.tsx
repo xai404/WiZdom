@@ -7,9 +7,21 @@ interface DashboardLayoutProps {
   title?: string;
   subtitle?: string;
   children: ReactNode;
+  // Fill the viewport exactly (no page scroll, no BottomNav — its links move
+  // into TopBar). The child gets the full remaining height via h-full.
+  fullscreen?: boolean;
 }
 
-const DashboardLayout = ({ title, subtitle, children }: DashboardLayoutProps) => {
+const DashboardLayout = ({ title, subtitle, children, fullscreen = false }: DashboardLayoutProps) => {
+  if (fullscreen) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-linear-to-br from-brand-50 via-white to-brand-50">
+        <TopBar showNav />
+        <main className="min-h-0 flex-1 p-2 sm:p-3">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-brand-50 via-white to-brand-50">
       <TopBar />

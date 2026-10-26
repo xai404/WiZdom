@@ -8,11 +8,11 @@ import {
   EMPTY_INTERNSHIP_ROW,
   EMPTY_PERSONAL_DETAILS,
   EMPTY_SOP,
+  EMPTY_PROFESSIONAL_DETAILS,
   type AcademicQualification,
   type ChatMessage,
   type DocumentChecklistItem,
   type JourneyStage,
-  type JourneyStageStatus,
   type Sif,
   type Student,
   type StudentStatus,
@@ -70,8 +70,15 @@ const normalizeSif = (s: any): Sif => ({
   internshipExperience: Array.isArray(s?.internshipExperience)
     ? s.internshipExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
     : [],
+  industryExperience: Array.isArray(s?.industryExperience)
+    ? s.industryExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
+    : [],
+  professionalDetails: { ...EMPTY_PROFESSIONAL_DETAILS, ...(s?.professionalDetails ?? {}) },
+  lorAssistance: s?.lorAssistance === 'yes' || s?.lorAssistance === 'no' ? s.lorAssistance : '',
+  sopAssistance: s?.sopAssistance === 'yes' || s?.sopAssistance === 'no' ? s.sopAssistance : '',
   documentChecklist: normalizeDocuments(s?.documentChecklist),
   sop: { ...EMPTY_SOP, ...(s?.sop ?? {}) },
+  termsAcceptedAt: s?.termsAcceptedAt ?? null,
   updatedAt: s?.updatedAt ?? null,
   updatedByName: s?.updatedByName ?? null,
 });
@@ -91,6 +98,7 @@ const normalize = (s: any): Student => ({
   assignedCounsellor: s.assignedCounsellor ?? '',
   groupName: s.groupName ?? '',
   paymentStatus: s.paymentStatus ?? null,
+  paymentRemark: s.paymentRemark ?? '',
   createdBy: s.createdBy,
   updatedBy: s.updatedBy,
   updatedAt: s.updatedAt,
@@ -103,6 +111,9 @@ const normalize = (s: any): Student => ({
   lastHandledBy: s.lastHandledBy?.id ? { id: s.lastHandledBy.id, name: s.lastHandledBy.name, department: s.lastHandledBy.department } : null,
   lastHandledAt: s.lastHandledAt ?? null,
   journeyCompleted: s.journeyCompleted ?? false,
+  // Per-viewer count of unread student messages — drives the number badge
+  // on the list card. Only the list endpoint sends it.
+  unreadCount: typeof s.unreadCount === 'number' ? s.unreadCount : 0,
   responseStatus: s.responseStatus ?? 'in_progress',
   journey: s.journey ?? [],
   sif: normalizeSif(s.sif),
@@ -163,12 +174,17 @@ export const fetchStudentJourney = async (id: string): Promise<JourneyStage[]> =
   return res.data.journey;
 };
 
-export const updateStudentJourneyStage = async (
-  id: string,
-  title: string,
-  status: JourneyStageStatus
-): Promise<void> => {
-  await api.patch(`/students/${id}/journey`, { title, status });
+// `substepKey` is a JourneySubstep.key; `status` one of its options' values.
+export const updateStudentJourneyStage = async (id: string, substepKey: string, status: string): Promise<void> => {
+  await api.patch(`/students/${id}/journey`, { title: substepKey, status });
+};
+
+export const addStudentJourneyRemark = async (id: string, title: string, text: string): Promise<void> => {
+  await api.post(`/students/${id}/journey/remarks`, { title, text });
+};
+
+export const deleteStudentJourneyRemark = async (id: string, remarkId: string): Promise<void> => {
+  await api.delete(`/students/${id}/journey/remarks/${remarkId}`);
 };
 
 export const fetchStudentChat = async (id: string): Promise<ChatMessage[]> => {
@@ -181,9 +197,10 @@ export const postStudentChatMessage = async (
   text: string,
   stage: string | null,
   replyTo: string | null = null,
-  department: string | null = null
+  department: string | null = null,
+  mentionStudent = false
 ): Promise<ChatMessage> => {
-  const res = await api.post(`/students/${id}/chat`, { text, stage, replyTo, department });
+  const res = await api.post(`/students/${id}/chat`, { text, stage, replyTo, department, mentionStudent });
   return res.data.message;
 };
 

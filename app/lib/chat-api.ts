@@ -16,6 +16,8 @@ export type ChatMessage = {
   // tag) — stripped server-side from admin-authored messages, which route
   // internally without exposing that detail to the student. See
   // studentChatController.getMyChat.
+  // Staff @mentioned the student on this message.
+  mentionsStudent?: boolean;
   department: string | null;
   readByStudent: boolean;
   // Whether staff have read this message — only meaningful for messages the

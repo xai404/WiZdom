@@ -159,4 +159,58 @@ const buildStudentPasswordResetEmailHtml = (student, password) => {
   return emailShell('Your WiZdom Password Was Reset', body);
 };
 
-module.exports = { buildStudentAccountEmailHtml, buildEmployeeAccountEmailHtml, buildStudentPasswordResetEmailHtml };
+const buildPasswordResetOtpEmailHtml = (student, otp, expiresInMinutes) => {
+  const body = `
+    <p style="margin:0 0 16px;font-size:16px;color:#0f172a;">Dear ${escapeHtml(student.name)},</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
+      We received a request to reset your <strong>WiZdom Student Portal</strong> password. Enter the
+      verification code below in the app to continue.
+    </p>
+
+    <div style="margin:24px 0;padding:20px;background-color:#f0fdf4;border-radius:12px;text-align:center;">
+      <p style="margin:0;font-size:32px;font-weight:700;letter-spacing:8px;color:#166534;">${escapeHtml(otp)}</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#64748b;">This code expires in ${escapeHtml(expiresInMinutes)} minutes.</p>
+    </div>
+
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#334155;">
+      If you did not request a password reset, you can safely ignore this email &mdash; your password
+      will not change.
+    </p>
+    <p style="margin:24px 0 0;font-size:14px;color:#334155;">Warm regards,<br/>Team WiZdom</p>
+  `;
+
+  return emailShell('Your WiZdom Password Reset Code', body);
+};
+
+const buildForgotPasswordNewPasswordEmailHtml = (student, password) => {
+  const body = `
+    <p style="margin:0 0 16px;font-size:16px;color:#0f172a;">Dear ${escapeHtml(student.name)},</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
+      Your <strong>WiZdom Student Portal</strong> password has been reset. Use the new password below
+      to log in, then change it from your Profile if you like.
+    </p>
+
+    ${sectionHeading('Your Updated Login Credentials')}
+    ${detailTable([
+      detailRow('Login Email', student.email),
+      detailRow('New Password', password),
+    ])}
+
+    <div style="margin:24px 0;padding:16px 20px;background-color:#eff6ff;border-left:4px solid #3b82f6;border-radius:8px;">
+      <p style="margin:0;font-size:14px;color:#1e3a8a;">
+        If you did not request this change, please contact your counsellor right away.
+      </p>
+    </div>
+    <p style="margin:24px 0 0;font-size:14px;color:#334155;">Warm regards,<br/>Team WiZdom</p>
+  `;
+
+  return emailShell('Your New WiZdom Password', body);
+};
+
+module.exports = {
+  buildStudentAccountEmailHtml,
+  buildEmployeeAccountEmailHtml,
+  buildStudentPasswordResetEmailHtml,
+  buildPasswordResetOtpEmailHtml,
+  buildForgotPasswordNewPasswordEmailHtml,
+};

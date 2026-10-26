@@ -31,6 +31,9 @@ const StudentCard = ({ student, selected, onSelect, onEdit, onDelete }: StudentC
   // (see getPipelineOutline) — a pending message is surfaced via the dot
   // and the "Awaiting" badge next to the name, not by overriding the border.
   const pipelineOutline = getPipelineOutline(student);
+  // The open chat is being read right now, so it never shows a badge.
+  const unread = selected ? 0 : (student.unreadCount ?? 0);
+  const hasUnread = unread > 0;
 
   return (
     <motion.div
@@ -82,7 +85,7 @@ const StudentCard = ({ student, selected, onSelect, onEdit, onDelete }: StudentC
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className={clsx('truncate text-sm text-slate-800', isAwaiting ? 'font-bold' : 'font-semibold')}>
+          <p className={clsx('truncate text-sm text-slate-800', isAwaiting || hasUnread ? 'font-bold' : 'font-semibold')}>
             {hasGroupName ? student.groupName : student.name}
           </p>
           {isAwaiting && (
@@ -92,10 +95,25 @@ const StudentCard = ({ student, selected, onSelect, onEdit, onDelete }: StudentC
           )}
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-slate-500">{hasGroupName ? student.name : student.email}</p>
-          <PaymentStars paymentStatus={student.paymentStatus} />
+          {hasUnread ? (
+            <p className="truncate text-xs font-semibold text-brand-600">
+              {unread === 1 ? 'New message' : `${unread} new messages`}
+            </p>
+          ) : (
+            <p className="truncate text-xs text-slate-500">{hasGroupName ? student.name : student.email}</p>
+          )}
+          <PaymentStars paymentStatus={student.paymentStatus} paymentRemark={student.paymentRemark} />
         </div>
       </div>
+
+      {hasUnread && (
+        <span
+          aria-label={`${unread} unread`}
+          className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white"
+        >
+          {unread > 99 ? '99+' : unread}
+        </span>
+      )}
 
       {(onEdit || onDelete) && (
         <div className="flex shrink-0 items-center gap-1">

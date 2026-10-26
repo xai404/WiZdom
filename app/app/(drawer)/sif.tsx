@@ -1,23 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   UIManager,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateField } from '@/components/date-field';
+import {
+  AddRowButton,
+  ErrorNote,
+  Field,
+  IntroNote,
+  LoadErrorBanner,
+  RowCard,
+  SaveBar,
+  savedTimeNote,
+} from '@/components/sif-form';
 import { Toast } from '@/components/toast';
 import { TopBar } from '@/components/top-bar';
 import { useAuth } from '@/context/auth-context';
+import { SCHOLARSHIP_INTRO, SCHOLARSHIP_TERMS, STUDENT_UNDERTAKING } from '@/constants/sif-terms';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
   buildDefaultAcademicQualifications,
@@ -25,22 +34,20 @@ import {
   DOCUMENT_CHECKLIST_TEMPLATE,
   EMPTY_INTEREST_FORM,
   EMPTY_INTERNSHIP_ROW,
-  EMPTY_LOR_RECOMMENDER,
   EMPTY_PERSONAL_DETAILS,
-  EMPTY_SOP,
+  EMPTY_PROFESSIONAL_DETAILS,
   fetchMySif,
   updateMySif,
   type AcademicQualification,
   type DocumentChecklistItem,
   type InterestForm,
   type InternshipRow,
-  type LorRecommender,
   type PersonalDetails,
-  type Sif,
-  type SopDetails,
+  type ProfessionalDetails,
+  type SifUpdate,
 } from '@/lib/sif-api';
 
-const PRIMARY = '#166534';
+const PRIMARY = '#1d4ed8';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -50,9 +57,9 @@ const animateNext = () =>
 
 const asList = (values: string[]) => (values && values.length ? values.join(', ') : '');
 
-// The Student Interest Form as a fixed Field / Response list — carried over
-// from the CRM enquiry and shown read-only here (the student edits it via
-// their counsellor, not in-app). Mirrors the admin panel's SIF document.
+// The Student Interest Form as a fixed Field / Response list — pre-filled
+// from the CRM enquiry. Shown as a summary until the student taps Edit.
+// Mirrors the admin panel's SIF document.
 const buildInterestRows = (f: InterestForm): [string, string][] => [
   ['Name of the Applicant', f.applicantName],
   ['Mobile Number', f.mobile],
@@ -68,6 +75,38 @@ const buildInterestRows = (f: InterestForm): [string, string][] => [
   ['How did you get to know about WiZdom?', f.hearAboutUs],
 ];
 
+type InterestTextKey = {
+  [K in keyof InterestForm]-?: InterestForm[K] extends string ? K : never;
+}[keyof InterestForm];
+type InterestListKey = {
+  [K in keyof InterestForm]-?: InterestForm[K] extends string[] ? K : never;
+}[keyof InterestForm];
+
+// Edit-mode field list, same order as buildInterestRows. List fields are
+// typed as comma-separated text.
+const INTEREST_FIELDS: (
+  | { kind: 'text'; key: InterestTextKey; label: string; keyboardType?: 'email-address' | 'phone-pad' }
+  | { kind: 'list'; key: InterestListKey; label: string }
+)[] = [
+  { kind: 'text', key: 'applicantName', label: 'Name of the Applicant' },
+  { kind: 'text', key: 'mobile', label: 'Mobile Number', keyboardType: 'phone-pad' },
+  { kind: 'text', key: 'alternateContact', label: 'Alternate Mobile / Telephone', keyboardType: 'phone-pad' },
+  { kind: 'text', key: 'email', label: 'Email ID', keyboardType: 'email-address' },
+  { kind: 'list', key: 'preferredCountries', label: 'Preferred Countries' },
+  { kind: 'list', key: 'preferredStreams', label: 'Preferred Stream' },
+  { kind: 'text', key: 'budget', label: 'Comfortable Budget: Fee / year' },
+  { kind: 'text', key: 'preferredIntake', label: 'Preferred Intake (month & year)' },
+  { kind: 'list', key: 'entranceTestSupport', label: 'Entrance Test support' },
+  { kind: 'list', key: 'admissionSupport', label: 'Admission support' },
+  { kind: 'text', key: 'giftChoice', label: 'Gift choice' },
+  { kind: 'text', key: 'hearAboutUs', label: 'How did you get to know about WiZdom?' },
+];
+
+// split/join round-trip the student's typing exactly ("USA, " stays "USA, ")
+// — trimming and blank-removal happen once, on save.
+const splitList = (text: string) => (text ? text.split(/, ?/) : []);
+const cleanList = (values: string[]) => values.map((v) => v.trim()).filter(Boolean);
+
 function InfoRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
     <View className={`px-4 py-2.5 ${last ? '' : 'border-b border-slate-100 dark:border-slate-800'}`}>
@@ -79,39 +118,36 @@ function InfoRow({ label, value, last }: { label: string; value: string; last?: 
   );
 }
 
-function Field({
-  label,
-  hint,
-  value,
-  onChangeText,
-  placeholder,
-  multiline,
-  keyboardType,
+// Internship and Industry Experience rows share the same editor:
+// company, designation, working from / to.
+function ExperienceList({
+  rows,
+  onChange,
+  itemLabel,
+  addLabel,
 }: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  placeholder?: string;
-  multiline?: boolean;
-  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  rows: InternshipRow[];
+  onChange: (rows: InternshipRow[]) => void;
+  itemLabel: string;
+  addLabel: string;
 }) {
-  const { isDark } = useAppTheme();
+  const today = new Date();
+  const setRow = (i: number, patch: Partial<InternshipRow>) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const removeRow = (i: number) =>
+    onChange(rows.length === 1 ? [{ ...EMPTY_INTERNSHIP_ROW }] : rows.filter((_, idx) => idx !== i));
   return (
-    <View className="mb-3.5">
-      <Text className="mb-1 text-[13px] font-semibold text-slate-700 dark:text-slate-200">{label}</Text>
-      {hint ? <Text className="mb-1.5 text-[11.5px] leading-4 text-slate-400 dark:text-slate-500">{hint}</Text> : null}
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
-        multiline={multiline}
-        keyboardType={keyboardType}
-        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[14px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-        style={multiline ? { minHeight: 88, textAlignVertical: 'top' } : undefined}
-      />
-    </View>
+    <>
+      {rows.map((row, i) => (
+        <RowCard key={i} title={`${itemLabel} ${i + 1}`} onRemove={() => removeRow(i)}>
+          <Field label="Name of the Company" value={row.nameOfEmployer} onChangeText={(v) => setRow(i, { nameOfEmployer: v })} />
+          <Field label="Designation" value={row.designation} onChangeText={(v) => setRow(i, { designation: v })} />
+          <DateField label="Working From" value={row.dateFrom} onChange={(v) => setRow(i, { dateFrom: v })} maxYear={today.getFullYear()} />
+          <DateField label="Working To" value={row.dateTo} onChange={(v) => setRow(i, { dateTo: v })} maxYear={today.getFullYear()} />
+        </RowCard>
+      ))}
+      <AddRowButton label={addLabel} onPress={() => onChange([...rows, { ...EMPTY_INTERNSHIP_ROW }])} />
+    </>
   );
 }
 
@@ -194,7 +230,7 @@ function Collapsible({
         onPress={onToggle}
         className="flex-row items-center gap-3 px-3.5 py-3 active:bg-slate-50 dark:active:bg-slate-800/40">
         <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-950">
-          <Ionicons name={icon} size={17} color={isDark ? '#86c99b' : PRIMARY} />
+          <Ionicons name={icon} size={17} color={isDark ? '#93c5fd' : PRIMARY} />
         </View>
         <View className="flex-1">
           <Text className="text-[14px] font-bold text-slate-900 dark:text-white">{title}</Text>
@@ -258,24 +294,28 @@ export default function SifScreen() {
   // The form (the questions) is static content and always renders. Only the
   // *saved answers* come from the network — while that's in flight or if it
   // fails, the fields just stay at their defaults.
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [lor, setLor] = useState<LorRecommender[]>([{ ...EMPTY_LOR_RECOMMENDER }]);
-  const [sop, setSop] = useState<SopDetails>({ ...EMPTY_SOP });
   const [personal, setPersonal] = useState<PersonalDetails>({ ...EMPTY_PERSONAL_DETAILS });
   const [academics, setAcademics] = useState<AcademicQualification[]>(buildDefaultAcademicQualifications());
   const [internships, setInternships] = useState<InternshipRow[]>([{ ...EMPTY_INTERNSHIP_ROW }]);
+  const [industry, setIndustry] = useState<InternshipRow[]>([{ ...EMPTY_INTERNSHIP_ROW }]);
+  const [professional, setProfessional] = useState<ProfessionalDetails>({ ...EMPTY_PROFESSIONAL_DETAILS });
+  // Terms & Conditions: `termsAcceptedAt` is the server's record; `agreeTicked`
+  // is the checkbox before it has been saved. Once accepted it can't be undone.
+  const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+  const [agreeTicked, setAgreeTicked] = useState(false);
   const [documents, setDocuments] = useState<DocumentChecklistItem[]>(buildDefaultDocumentChecklist());
-  // Read-only in the app (carried over from the CRM enquiry). Kept in state
-  // only so it round-trips unchanged when the student saves their LOR/SOP —
-  // the server's sanitizeSif rebuilds the whole object, so dropping it from
-  // the payload would wipe it.
+  // Pre-filled from the CRM enquiry; editable via the section's Edit button.
+  // Always sent back in full — the server's sanitizeSif rebuilds the whole
+  // object, so dropping it from the payload would wipe it.
   const [interestForm, setInterestForm] = useState<InterestForm>({ ...EMPTY_INTEREST_FORM });
+  const [editingInterest, setEditingInterest] = useState(false);
 
   // Which accordion sections are expanded — everything starts collapsed so
   // the screen opens as a short, scannable list of sections.
@@ -294,27 +334,25 @@ export default function SifScreen() {
   // "Unsaved changes".
   const baselineRef = useRef(
     JSON.stringify({
-      lor: [EMPTY_LOR_RECOMMENDER],
       interestForm: EMPTY_INTEREST_FORM,
       personal: EMPTY_PERSONAL_DETAILS,
       academics: buildDefaultAcademicQualifications(),
       internships: [EMPTY_INTERNSHIP_ROW],
+      industry: [EMPTY_INTERNSHIP_ROW],
+      professional: EMPTY_PROFESSIONAL_DETAILS,
       documents: buildDefaultDocumentChecklist(),
-      sop: EMPTY_SOP,
     }),
   );
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    setLoadError(null);
+    setLoadError(false);
     fetchMySif(token)
       .then((data) => {
         if (cancelled) return;
         // Only overwrite the fields if the server actually has answers —
         // never clobber something the student has already started typing.
-        if (data.lor.length) setLor(data.lor);
-        if (Object.values(data.sop).some((v) => v)) setSop(data.sop);
         const hasInterest = Object.entries(data.interestForm).some(
           ([k, v]) => k !== 'sourcedFromCrmAt' && (Array.isArray(v) ? v.length : v),
         );
@@ -327,30 +365,42 @@ export default function SifScreen() {
         if (hasAcademics) setAcademics(data.academicQualifications);
         const hasInternships = data.internshipExperience.some((r) => Object.values(r).some((v) => v));
         if (hasInternships) setInternships(data.internshipExperience);
+        const hasIndustry = data.industryExperience.some((r) => Object.values(r).some((v) => v));
+        if (hasIndustry) setIndustry(data.industryExperience);
+        // Older records have rows but no Yes/No answer yet — treat as "Yes".
+        const nextProfessional: ProfessionalDetails = {
+          ...data.professionalDetails,
+          hasInternship: data.professionalDetails.hasInternship || (hasInternships ? 'yes' : ''),
+          hasIndustryExperience: data.professionalDetails.hasIndustryExperience || (hasIndustry ? 'yes' : ''),
+        };
+        setProfessional(nextProfessional);
+        setTermsAcceptedAt(data.termsAcceptedAt ?? null);
         const hasDocuments = data.documentChecklist.some((d) => d.ready);
         if (hasDocuments) setDocuments(data.documentChecklist);
         baselineRef.current = JSON.stringify({
-          lor: data.lor.length ? data.lor : [EMPTY_LOR_RECOMMENDER],
           interestForm: hasInterest ? data.interestForm : EMPTY_INTEREST_FORM,
           personal: hasPersonal ? data.personalDetails : EMPTY_PERSONAL_DETAILS,
           academics: hasAcademics ? data.academicQualifications : buildDefaultAcademicQualifications(),
           internships: hasInternships ? data.internshipExperience : [EMPTY_INTERNSHIP_ROW],
+          industry: hasIndustry ? data.industryExperience : [EMPTY_INTERNSHIP_ROW],
+          professional: nextProfessional,
           documents: hasDocuments ? data.documentChecklist : buildDefaultDocumentChecklist(),
-          sop: Object.values(data.sop).some((v) => v) ? data.sop : EMPTY_SOP,
         });
         if (data.updatedAt) {
           setSavedNote(`Last saved ${new Date(data.updatedAt).toLocaleDateString()}`);
         }
       })
-      .catch((err) => !cancelled && setLoadError(err instanceof Error ? err.message : 'Something went wrong.'));
+      .catch(() => !cancelled && setLoadError(true));
     return () => {
       cancelled = true;
     };
   }, [token, reloadKey]);
 
+  const termsPending = agreeTicked && !termsAcceptedAt;
   const dirty =
-    JSON.stringify({ lor, interestForm, personal, academics, internships, documents, sop }) !==
-    baselineRef.current;
+    termsPending ||
+    JSON.stringify({ interestForm, personal, academics, internships, industry, professional, documents }) !==
+      baselineRef.current;
 
   const interestRows = buildInterestRows(interestForm);
   const hasInterestForm = interestRows.some(([, value]) => value.trim());
@@ -358,71 +408,95 @@ export default function SifScreen() {
   const today = new Date();
 
   // Per-section completion hints for the collapsed accordion headers.
-  const rowIsFilled = (r: AcademicQualification | InternshipRow | LorRecommender) =>
+  const rowIsFilled = (r: AcademicQualification | InternshipRow) =>
     countFilled({ ...r, level: undefined } as Record<string, unknown>) > 0;
   const personalFilled = countFilled(personal as unknown as Record<string, unknown>);
   const academicCount = academics.filter(rowIsFilled).length;
   const internshipCount = internships.filter(rowIsFilled).length;
-  const lorCount = lor.filter(rowIsFilled).length;
-  const sopFilled = countFilled(sop as unknown as Record<string, unknown>);
+  const industryCount = industry.filter(rowIsFilled).length;
+  const professionalStatus =
+    !professional.hasInternship && !professional.hasIndustryExperience
+      ? 'Not started'
+      : [
+          professional.hasInternship === 'yes'
+            ? `${internshipCount} internship${internshipCount === 1 ? '' : 's'}`
+            : professional.hasInternship === 'no'
+              ? 'No internship'
+              : null,
+          professional.hasIndustryExperience === 'yes'
+            ? professional.industryYears
+              ? `${professional.industryYears} yr industry exp.`
+              : `${industryCount} job${industryCount === 1 ? '' : 's'}`
+            : professional.hasIndustryExperience === 'no'
+              ? 'No industry exp.'
+              : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+  const setProfessionalField = (patch: Partial<ProfessionalDetails>) =>
+    setProfessional((prev) => ({ ...prev, ...patch }));
   const docAnswered = documents.filter((d) => d.ready).length;
 
   const setPersonalField = (patch: Partial<PersonalDetails>) => setPersonal((prev) => ({ ...prev, ...patch }));
   const setAcademicRow = (i: number, patch: Partial<AcademicQualification>) =>
     setAcademics((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const setInternshipRow = (i: number, patch: Partial<InternshipRow>) =>
-    setInternships((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const addInternship = () => setInternships((prev) => [...prev, { ...EMPTY_INTERNSHIP_ROW }]);
-  const removeInternship = (i: number) =>
-    setInternships((prev) => (prev.length === 1 ? [{ ...EMPTY_INTERNSHIP_ROW }] : prev.filter((_, idx) => idx !== i)));
   const setDocReady = (key: string, ready: DocumentChecklistItem['ready']) =>
     setDocuments((prev) => prev.map((d) => (d.key === key ? { ...d, ready } : d)));
 
-  const setRecommender = (i: number, patch: Partial<LorRecommender>) =>
-    setLor((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const addRecommender = () => setLor((prev) => [...prev, { ...EMPTY_LOR_RECOMMENDER }]);
-  const removeRecommender = (i: number) =>
-    setLor((prev) => (prev.length === 1 ? [{ ...EMPTY_LOR_RECOMMENDER }] : prev.filter((_, idx) => idx !== i)));
-  const setSopField = (patch: Partial<SopDetails>) => setSop((prev) => ({ ...prev, ...patch }));
+  const setInterestField = (patch: Partial<InterestForm>) => setInterestForm((prev) => ({ ...prev, ...patch }));
 
   const handleSave = async () => {
     if (!token) return;
     setSaving(true);
     setError(null);
     try {
-      const cleanedLor = lor.filter((r) => Object.values(r).some((v) => v.trim()));
-      const cleanedInternships = internships.filter((r) => Object.values(r).some((v) => v.trim()));
-      const payload: Sif = {
-        lor: cleanedLor,
-        interestForm,
+      const hasText = (r: InternshipRow) => Object.values(r).some((v) => v.trim());
+      // LOR and SOP are saved from their own tabs — not sent from here, so the
+      // server keeps them as they are.
+      const payload: SifUpdate = {
+        interestForm: {
+          ...interestForm,
+          preferredCountries: cleanList(interestForm.preferredCountries),
+          preferredStreams: cleanList(interestForm.preferredStreams),
+          entranceTestSupport: cleanList(interestForm.entranceTestSupport),
+          admissionSupport: cleanList(interestForm.admissionSupport),
+        },
         personalDetails: personal,
         academicQualifications: academics,
-        internshipExperience: cleanedInternships,
+        internshipExperience: professional.hasInternship === 'yes' ? internships.filter(hasText) : [],
+        industryExperience: professional.hasIndustryExperience === 'yes' ? industry.filter(hasText) : [],
+        professionalDetails: {
+          ...professional,
+          industryYears: professional.hasIndustryExperience === 'yes' ? professional.industryYears.trim() : '',
+        },
         documentChecklist: documents,
-        sop,
+        ...(termsPending ? { termsAccepted: true } : {}),
       };
       const saved = await updateMySif(token, payload);
-      const nextLor = saved.lor.length ? saved.lor : [{ ...EMPTY_LOR_RECOMMENDER }];
       const nextInternships = saved.internshipExperience.length
         ? saved.internshipExperience
         : [{ ...EMPTY_INTERNSHIP_ROW }];
-      setLor(nextLor);
+      const nextIndustry = saved.industryExperience.length ? saved.industryExperience : [{ ...EMPTY_INTERNSHIP_ROW }];
       setInterestForm(saved.interestForm);
       setPersonal(saved.personalDetails);
       setAcademics(saved.academicQualifications);
       setInternships(nextInternships);
+      setIndustry(nextIndustry);
+      setProfessional(saved.professionalDetails);
       setDocuments(saved.documentChecklist);
-      setSop(saved.sop);
+      setTermsAcceptedAt(saved.termsAcceptedAt ?? null);
+      setAgreeTicked(false);
       baselineRef.current = JSON.stringify({
-        lor: nextLor,
         interestForm: saved.interestForm,
         personal: saved.personalDetails,
         academics: saved.academicQualifications,
         internships: nextInternships,
+        industry: nextIndustry,
+        professional: saved.professionalDetails,
         documents: saved.documentChecklist,
-        sop: saved.sop,
       });
-      setSavedNote(`Saved ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+      setEditingInterest(false);
+      setSavedNote(savedTimeNote());
       setToast('Saved successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save. Please try again.');
@@ -440,37 +514,65 @@ export default function SifScreen() {
         className="flex-1"
         keyboardVerticalOffset={90}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-            {loadError ? (
-              <Pressable
-                onPress={() => setReloadKey((k) => k + 1)}
-                className="mb-3 flex-row items-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 active:opacity-80 dark:bg-amber-950">
-                <Ionicons name="cloud-offline-outline" size={15} color="#d97706" />
-                <Text className="flex-1 text-[12px] text-amber-700 dark:text-amber-300">
-                  Couldn&apos;t load your saved answers. You can still fill this in — tap to retry.
-                </Text>
-              </Pressable>
-            ) : null}
+            <LoadErrorBanner show={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
 
-            <View className="mb-4 flex-row gap-2.5 rounded-2xl bg-brand-50 px-3.5 py-3 dark:bg-brand-950/50">
-              <Ionicons name="information-circle-outline" size={16} color={isDark ? '#86c99b' : PRIMARY} />
-              <Text className="flex-1 text-[12px] leading-4 text-brand-700 dark:text-brand-200">
-                Tap a section to fill it in. You do not need to write the LOR or SOP yourself — brief points are
-                enough.
-              </Text>
-            </View>
+            <IntroNote>
+              Tap a section to fill it in, then Save. Your LOR and SOP details have their own tabs at the bottom.
+            </IntroNote>
 
-            {/* ---------- Student Interest Form (read-only, from the CRM enquiry) ---------- */}
+            {/* ---------- Student Interest Form (pre-filled from the CRM enquiry) ---------- */}
             <Collapsible
               icon="clipboard-outline"
               title="Student Interest Form"
-              status={hasInterestForm ? 'From your enquiry · read-only' : 'Nothing on file'}
-              tone="muted"
+              status={
+                editingInterest ? 'Editing' : hasInterestForm ? 'From your enquiry · tap Edit to update' : 'Not started'
+              }
+              tone={editingInterest || hasInterestForm ? 'accent' : 'muted'}
               open={openKey === 'interest'}
               onToggle={() => toggleSection('interest')}>
-              <Text className="mb-2.5 text-[12px] leading-4 text-slate-400 dark:text-slate-500">
-                Taken from the enquiry form you submitted. Contact your counsellor if anything needs updating.
-              </Text>
-              {hasInterestForm ? (
+              <View className="mb-2.5 flex-row items-center gap-2">
+                <Text className="flex-1 text-[12px] leading-4 text-slate-400 dark:text-slate-500">
+                  {editingInterest
+                    ? 'Update your details, then tap Save at the bottom. Separate multiple values with commas.'
+                    : hasInterestForm
+                      ? 'Taken from the enquiry form you submitted.'
+                      : 'Tap Edit to fill in your study preferences.'}
+                </Text>
+                {!editingInterest ? (
+                  <Pressable
+                    onPress={() => {
+                      animateNext();
+                      setEditingInterest(true);
+                    }}
+                    className="flex-row items-center gap-1 rounded-full border border-brand-500 bg-brand-50 px-3 py-1 active:opacity-80 dark:border-brand-400 dark:bg-brand-950">
+                    <Ionicons name="create-outline" size={13} color={isDark ? '#93c5fd' : PRIMARY} />
+                    <Text className="text-[12px] font-semibold text-brand-700 dark:text-brand-200">Edit</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {editingInterest ? (
+                <View>
+                  {INTEREST_FIELDS.map((f) =>
+                    f.kind === 'text' ? (
+                      <Field
+                        key={f.key}
+                        label={f.label}
+                        value={interestForm[f.key]}
+                        onChangeText={(v) => setInterestField({ [f.key]: v })}
+                        keyboardType={f.keyboardType}
+                      />
+                    ) : (
+                      <Field
+                        key={f.key}
+                        label={f.label}
+                        value={interestForm[f.key].join(', ')}
+                        onChangeText={(v) => setInterestField({ [f.key]: splitList(v) })}
+                        placeholder="e.g. USA, Canada"
+                      />
+                    ),
+                  )}
+                </View>
+              ) : hasInterestForm ? (
                 <View className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
                   {interestRows.map(([label, value], i) => (
                     <InfoRow key={label} label={label} value={value} last={i === interestRows.length - 1} />
@@ -595,7 +697,7 @@ export default function SifScreen() {
               {academics.map((row, i) => {
                 const filled = countFilled({ ...row, level: undefined } as Record<string, unknown>) > 0;
                 const summary =
-                  [row.percentage && `${row.percentage}%`, row.boardUniversity || row.schoolCollegeName]
+                  [row.percentage && `${row.percentage}%`, row.schoolCollegeName]
                     .filter(Boolean)
                     .join(' · ') || 'Not filled';
                 return (
@@ -632,198 +734,62 @@ export default function SifScreen() {
                       value={row.schoolCollegeName}
                       onChangeText={(v) => setAcademicRow(i, { schoolCollegeName: v })}
                     />
-                    <Field
-                      label="Board / University"
-                      value={row.boardUniversity}
-                      onChangeText={(v) => setAcademicRow(i, { boardUniversity: v })}
-                    />
                   </SubCard>
                 );
               })}
             </Collapsible>
 
-            {/* ---------- Internship / Industry Experience ---------- */}
+            {/* ---------- Professional Details ---------- */}
             <Collapsible
               icon="briefcase-outline"
-              title="Internship / Industry Experience"
-              status={internshipCount === 0 ? 'None added (optional)' : `${internshipCount} added`}
-              tone={internshipCount === 0 ? 'muted' : 'accent'}
-              open={openKey === 'internship'}
-              onToggle={() => toggleSection('internship')}>
-              <Text className="mb-2.5 text-[12px] leading-4 text-slate-400 dark:text-slate-500">
-                Add your internships or jobs, if any. Leave blank if not applicable.
-              </Text>
-              {internships.map((row, i) => (
-              <View
-                key={i}
-                className="mb-2.5 rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
-                <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-[12px] font-bold uppercase tracking-wide text-brand-600 dark:text-brand-300">
-                    Experience {i + 1}
-                  </Text>
-                  <Pressable
-                    onPress={() => removeInternship(i)}
-                    hitSlop={8}
-                    className="flex-row items-center gap-1 rounded-lg px-2 py-1 active:bg-red-50 dark:active:bg-red-950">
-                    <Ionicons name="trash-outline" size={13} color={isDark ? '#64748b' : '#94a3b8'} />
-                    <Text className="text-[12px] text-slate-400 dark:text-slate-500">Remove</Text>
-                  </Pressable>
+              title="Professional Details"
+              status={professionalStatus}
+              tone={!professional.hasInternship && !professional.hasIndustryExperience ? 'muted' : 'accent'}
+              open={openKey === 'professional'}
+              onToggle={() => toggleSection('professional')}>
+              <Choice
+                label="Have you done any internship?"
+                options={['Yes', 'No']}
+                value={professional.hasInternship === 'yes' ? 'Yes' : professional.hasInternship === 'no' ? 'No' : ''}
+                onChange={(v) => {
+                  animateNext();
+                  setProfessionalField({ hasInternship: v === 'Yes' ? 'yes' : v === 'No' ? 'no' : '' });
+                }}
+              />
+              {professional.hasInternship === 'yes' ? (
+                <View className="mb-4">
+                  <ExperienceList
+                    rows={internships}
+                    onChange={setInternships}
+                    itemLabel="Internship"
+                    addLabel="Add another internship"
+                  />
                 </View>
-                <Field label="Name of Employer" value={row.nameOfEmployer} onChangeText={(v) => setInternshipRow(i, { nameOfEmployer: v })} />
-                <Field label="Address of Employer" multiline value={row.addressOfEmployer} onChangeText={(v) => setInternshipRow(i, { addressOfEmployer: v })} />
-                <Field label="Your Designation" value={row.designation} onChangeText={(v) => setInternshipRow(i, { designation: v })} />
-                <Field label="Salary (Monthly)" keyboardType="phone-pad" value={row.salaryMonthly} onChangeText={(v) => setInternshipRow(i, { salaryMonthly: v })} />
-                <DateField label="Date From" value={row.dateFrom} onChange={(v) => setInternshipRow(i, { dateFrom: v })} maxYear={today.getFullYear()} />
-                <DateField label="Date To" value={row.dateTo} onChange={(v) => setInternshipRow(i, { dateTo: v })} maxYear={today.getFullYear()} />
-              </View>
-              ))}
-              <Pressable
-                onPress={addInternship}
-                className="flex-row items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-300 py-2.5 active:bg-brand-50 dark:border-slate-700 dark:active:bg-slate-800">
-                <Ionicons name="add" size={16} color={isDark ? '#86c99b' : PRIMARY} />
-                <Text className="text-[13px] font-semibold text-brand-600 dark:text-brand-300">Add another experience</Text>
-              </Pressable>
-            </Collapsible>
+              ) : null}
 
-            {/* ---------- LOR ---------- */}
-            <Collapsible
-              icon="school-outline"
-              title="Letter of Recommendation (LOR)"
-              status={lorCount === 0 ? 'Not started' : `${lorCount} recommender${lorCount === 1 ? '' : 's'}`}
-              tone={lorCount === 0 ? 'muted' : 'accent'}
-              open={openKey === 'lor'}
-              onToggle={() => toggleSection('lor')}>
-              <Text className="mb-2.5 text-[12px] leading-4 text-slate-400 dark:text-slate-500">
-                Details about the professor or professional recommending you — one block per recommender.
-              </Text>
-              {lor.map((r, i) => (
-              <View
-                key={i}
-                className="mb-2.5 rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
-                <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-[12px] font-bold uppercase tracking-wide text-brand-600 dark:text-brand-300">
-                    Recommender {i + 1}
-                  </Text>
-                  <Pressable
-                    onPress={() => removeRecommender(i)}
-                    hitSlop={8}
-                    className="flex-row items-center gap-1 rounded-lg px-2 py-1 active:bg-red-50 dark:active:bg-red-950">
-                    <Ionicons name="trash-outline" size={13} color={isDark ? '#64748b' : '#94a3b8'} />
-                    <Text className="text-[12px] text-slate-400 dark:text-slate-500">Remove</Text>
-                  </Pressable>
+              <Choice
+                label="Do you have any industry experience?"
+                options={['Yes', 'No']}
+                value={professional.hasIndustryExperience === 'yes' ? 'Yes' : professional.hasIndustryExperience === 'no' ? 'No' : ''}
+                onChange={(v) => {
+                  animateNext();
+                  setProfessionalField({ hasIndustryExperience: v === 'Yes' ? 'yes' : v === 'No' ? 'no' : '' });
+                }}
+              />
+              {professional.hasIndustryExperience === 'yes' ? (
+                <View>
+                  <ExperienceList rows={industry} onChange={setIndustry} itemLabel="Company" addLabel="Add another company" />
+                  <View className="mt-3.5">
+                    <Field
+                      label="Years of Experience"
+                      hint="Your total industry experience, e.g. 2 or 1.5"
+                      keyboardType="phone-pad"
+                      value={professional.industryYears}
+                      onChangeText={(v) => setProfessionalField({ industryYears: v })}
+                    />
+                  </View>
                 </View>
-
-                <Field
-                  label="Name of the Professor / Professional"
-                  hint="Full name of the person providing the LOR."
-                  value={r.professorName}
-                  onChangeText={(v) => setRecommender(i, { professorName: v })}
-                />
-                <Field
-                  label="Official Phone Number"
-                  keyboardType="phone-pad"
-                  value={r.contactPhone}
-                  onChangeText={(v) => setRecommender(i, { contactPhone: v })}
-                />
-                <Field
-                  label="Official Email ID"
-                  keyboardType="email-address"
-                  value={r.contactEmail}
-                  onChangeText={(v) => setRecommender(i, { contactEmail: v })}
-                />
-                <Field
-                  label="Degree Studied"
-                  placeholder="e.g. BA in English"
-                  value={r.degreeStudied}
-                  onChangeText={(v) => setRecommender(i, { degreeStudied: v })}
-                />
-                <Field label="CGPA" value={r.cgpa} onChangeText={(v) => setRecommender(i, { cgpa: v })} />
-                <Field
-                  label="Subjects / Topics"
-                  hint="Subjects or papers they taught you, or the topics they worked with you on."
-                  multiline
-                  value={r.subjectsTopics}
-                  onChangeText={(v) => setRecommender(i, { subjectsTopics: v })}
-                />
-                <Field
-                  label="Projects"
-                  hint="Any academic, research, or professional projects you completed under their guidance."
-                  multiline
-                  value={r.projects}
-                  onChangeText={(v) => setRecommender(i, { projects: v })}
-                />
-                <Field
-                  label="Internships / Extracurricular Activities"
-                  hint="Any internship, leadership role, competition, event, or other notable activity you were involved in."
-                  multiline
-                  value={r.internshipsActivities}
-                  onChangeText={(v) => setRecommender(i, { internshipsActivities: v })}
-                />
-              </View>
-            ))}
-
-              <Pressable
-                onPress={addRecommender}
-                className="flex-row items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-300 py-2.5 active:bg-brand-50 dark:border-slate-700 dark:active:bg-slate-800">
-                <Ionicons name="add" size={16} color={isDark ? '#86c99b' : PRIMARY} />
-                <Text className="text-[13px] font-semibold text-brand-600 dark:text-brand-300">Add another recommender</Text>
-              </Pressable>
-            </Collapsible>
-
-            {/* ---------- SOP ---------- */}
-            <Collapsible
-              icon="document-text-outline"
-              title="Statement of Purpose (SOP)"
-              status={sopFilled === 0 ? 'Not started' : sopFilled === 5 ? 'Complete' : `${sopFilled} of 5 filled`}
-              tone={sopFilled === 0 ? 'muted' : sopFilled === 5 ? 'done' : 'accent'}
-              open={openKey === 'sop'}
-              onToggle={() => toggleSection('sop')}>
-              <Text className="mb-2.5 text-[12px] leading-4 text-slate-400 dark:text-slate-500">
-                Your background, motivation and future plans — simple points are fine.
-              </Text>
-              <View>
-              <Field
-                label="Course Name"
-                hint="The exact name of the course you are planning to pursue."
-                value={sop.courseName}
-                onChangeText={(v) => setSopField({ courseName: v })}
-              />
-              <Field
-                label="Motivation to Pursue the Course"
-                hint="Why you want to study this particular course — a personal experience, academic interest, professional experience, career-related interest, or something you observed in the industry or your personal life."
-                multiline
-                value={sop.motivation}
-                onChangeText={(v) => setSopField({ motivation: v })}
-              />
-              <Field
-                label="Additional Information"
-                hint="Any other personal, academic, professional, or relevant information you would like to include in your SOP."
-                multiline
-                value={sop.additionalInfo}
-                onChangeText={(v) => setSopField({ additionalInfo: v })}
-              />
-              <Field
-                label="What You Expect to Learn"
-                hint="Knowledge, skills, or areas of expertise you hope to gain from the course. You may also mention specific modules that interest you and why."
-                multiline
-                value={sop.expectationsToLearn}
-                onChangeText={(v) => setSopField({ expectationsToLearn: v })}
-              />
-              <Field
-                label="Future Plans After Graduation (focused on India)"
-                hint={
-                  'What you plan to do after the course, focused on India. You may mention:\n' +
-                  '• Companies or industries you would like to work in\n' +
-                  '• A family business you plan to join or expand\n' +
-                  '• A business idea or startup you would like to pursue\n' +
-                  '• A specific area or sector where you would like to build your career\n' +
-                  '• How you would like to apply the knowledge and skills gained from the course in India'
-                }
-                multiline
-                value={sop.futurePlans}
-                onChangeText={(v) => setSopField({ futurePlans: v })}
-              />
-              </View>
+              ) : null}
             </Collapsible>
 
             {/* ---------- Documents Ready With You ---------- */}
@@ -895,33 +861,77 @@ export default function SifScreen() {
               </View>
             </Collapsible>
 
-            {error ? (
-              <Text className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-[12.5px] text-red-600 dark:bg-red-950 dark:text-red-300">
-                {error}
+            {/* ---------- Terms & Conditions ---------- */}
+            <Collapsible
+              icon="shield-checkmark-outline"
+              title="Terms & Conditions"
+              status={
+                termsAcceptedAt
+                  ? `Agreed on ${new Date(termsAcceptedAt).toLocaleDateString()}`
+                  : agreeTicked
+                    ? 'Ticked — tap Save to confirm'
+                    : 'Please read and agree'
+              }
+              tone={termsAcceptedAt ? 'done' : agreeTicked ? 'accent' : 'muted'}
+              open={openKey === 'terms'}
+              onToggle={() => toggleSection('terms')}>
+              <Text className="mb-2 text-[13px] font-bold text-slate-800 dark:text-slate-100">Student Undertaking</Text>
+              {STUDENT_UNDERTAKING.map((line, idx) => (
+                <View key={idx} className="mb-1.5 flex-row gap-2">
+                  <Text className="text-[12px] leading-[18px] text-slate-400 dark:text-slate-500">{idx + 1}.</Text>
+                  <Text className="flex-1 text-[12px] leading-[18px] text-slate-600 dark:text-slate-300">{line}</Text>
+                </View>
+              ))}
+
+              <Text className="mb-2 mt-4 text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                WIZDOM Foundation Scholarship — Terms &amp; Conditions
               </Text>
-            ) : null}
+              <Text className="mb-3 text-[12px] leading-[18px] text-slate-600 dark:text-slate-300">{SCHOLARSHIP_INTRO}</Text>
+              {SCHOLARSHIP_TERMS.map((section) => (
+                <View key={section.title} className="mb-3">
+                  <Text className="mb-1 text-[12.5px] font-semibold text-slate-700 dark:text-slate-200">{section.title}</Text>
+                  {section.lines.map((line, idx) =>
+                    line.startsWith('• ') ? (
+                      <View key={idx} className="mb-0.5 flex-row gap-2 pl-3">
+                        <Text className="text-[12px] leading-[18px] text-slate-400">•</Text>
+                        <Text className="flex-1 text-[12px] leading-[18px] text-slate-600 dark:text-slate-300">
+                          {line.slice(2)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text key={idx} className="mb-1 text-[12px] leading-[18px] text-slate-600 dark:text-slate-300">
+                        {line}
+                      </Text>
+                    ),
+                  )}
+                </View>
+              ))}
+
+              <Pressable
+                disabled={!!termsAcceptedAt}
+                onPress={() => setAgreeTicked((v) => !v)}
+                className={`mt-2 flex-row items-start gap-2.5 rounded-xl border px-3.5 py-3 active:opacity-80 ${
+                  termsAcceptedAt || agreeTicked
+                    ? 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-950'
+                    : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+                }`}>
+                <Ionicons
+                  name={termsAcceptedAt || agreeTicked ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={termsAcceptedAt || agreeTicked ? (isDark ? '#93c5fd' : PRIMARY) : isDark ? '#64748b' : '#94a3b8'}
+                />
+                <Text className="flex-1 text-[12.5px] font-semibold leading-[18px] text-slate-700 dark:text-slate-200">
+                  {termsAcceptedAt
+                    ? `You agreed to these Terms & Conditions on ${new Date(termsAcceptedAt).toLocaleDateString()}.`
+                    : 'I have read, understood and agree to the Student Undertaking and the Terms & Conditions above.'}
+                </Text>
+              </Pressable>
+            </Collapsible>
+
+            <ErrorNote message={error} />
           </ScrollView>
 
-          {/* Save bar */}
-          <View className="border-t border-slate-100 bg-surface px-5 py-3 dark:border-slate-800 dark:bg-surface-dark">
-            <View className="flex-row items-center justify-between gap-3">
-              <Text className="text-[12px] text-slate-400 dark:text-slate-500">
-                {dirty ? 'Unsaved changes' : (savedNote ?? 'Not filled in yet')}
-              </Text>
-              <Pressable
-                onPress={handleSave}
-                disabled={!dirty || saving}
-                className="flex-row items-center gap-1.5 rounded-xl px-5 py-2.5 active:opacity-90"
-                style={{ backgroundColor: PRIMARY, opacity: !dirty || saving ? 0.5 : 1 }}>
-                {saving ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Ionicons name="save-outline" size={15} color="#ffffff" />
-                )}
-                <Text className="text-[14px] font-semibold text-white">Save</Text>
-              </Pressable>
-            </View>
-          </View>
+          <SaveBar dirty={dirty} saving={saving} savedNote={savedNote} onSave={handleSave} />
       </KeyboardAvoidingView>
 
       <Toast message={toast} tone="success" onHide={() => setToast(null)} />

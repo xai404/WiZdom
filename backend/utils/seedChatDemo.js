@@ -22,13 +22,11 @@ function ago(msAgo) {
 }
 
 const JOURNEY_OVERRIDES = [
-  { title: 'Career Counselling', status: 'completed' },
-  { title: 'Country & Course Guidance', status: 'completed' },
-  { title: 'Student Registration', status: 'completed' },
-  { title: 'Test Prep', status: 'completed' },
-  { title: 'Documentation', status: 'in_progress' },
-  { title: 'University Shortlisting', status: 'in_progress' },
-  { title: 'Offer Letters', status: 'completed' },
+  { title: 'Career Counselling / Country & Course', status: 'completed' },
+  { title: 'Career Counselling / University Shortlisting', status: 'in_progress' },
+  { title: 'Career Counselling / Student Registration', status: 'completed' },
+  { title: 'Documentation & Editing / Documents', status: 'in_progress' },
+  { title: 'Application Management / Application Status', status: 'offer_received' },
 ];
 
 function buildMessages(studentId, studentName) {
@@ -55,18 +53,18 @@ function buildMessages(studentId, studentName) {
     admin(`Hi ${studentName}, welcome aboard! I'm Aditi, your counsellor — I'll be with you at every step.`, null, 6 * DAY),
     student("Thank you so much, looking forward to it!", null, 6 * DAY - 20 * MIN),
 
-    admin('Congratulations! Your offer letter has arrived.', 'Offer Letters', 5 * DAY + 6 * HOUR),
-    student("That's amazing news, thank you!", 'Offer Letters', 5 * DAY + 5 * HOUR + 50 * MIN),
-    admin('Great. Once verified we will continue.', 'Offer Letters', 5 * DAY + 5 * HOUR + 30 * MIN),
+    admin('Congratulations! Your offer letter has arrived.', 'Application Management', 5 * DAY + 6 * HOUR),
+    student("That's amazing news, thank you!", 'Application Management', 5 * DAY + 5 * HOUR + 50 * MIN),
+    admin('Great. Once verified we will continue.', 'Application Management', 5 * DAY + 5 * HOUR + 30 * MIN),
 
-    admin('Hello, please upload your passport copy.', 'Documentation', 2 * DAY + 3 * HOUR),
-    student("Sure, I'll upload it today.", 'Documentation', 2 * DAY + 2 * HOUR + 48 * MIN),
-    admin('Great. Once verified we will continue.', 'Documentation', 2 * DAY + 2 * HOUR + 25 * MIN),
-    admin('Passport uploaded?', 'Documentation', 3 * HOUR),
+    admin('Hello, please upload your passport copy.', 'Documentation & Editing', 2 * DAY + 3 * HOUR),
+    student("Sure, I'll upload it today.", 'Documentation & Editing', 2 * DAY + 2 * HOUR + 48 * MIN),
+    admin('Great. Once verified we will continue.', 'Documentation & Editing', 2 * DAY + 2 * HOUR + 25 * MIN),
+    admin('Passport uploaded?', 'Documentation & Editing', 3 * HOUR),
 
-    admin("We're shortlisting a few strong-fit universities for you based on your scores.", 'University Shortlisting', 26 * HOUR),
+    admin("We're shortlisting a few strong-fit universities for you based on your scores.", 'Career Counselling', 26 * HOUR),
 
-    admin('Need updated bank statement.', 'Visa Documentation', 22 * HOUR),
+    admin('Need updated bank statement.', 'Visa Application', 22 * HOUR),
   ].map((entry) => ({ ...entry }));
 }
 

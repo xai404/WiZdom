@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text } from 'react-native';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const PRIMARY = '#166534';
-const ACCENT = '#2e8b57';
+const PRIMARY = '#1d4ed8';
+const ACCENT = '#2563eb';
 const GOLD = '#f59e0b';
 const VISIBLE_DURATION = 2400;
 
@@ -16,16 +16,16 @@ const VISIBLE_DURATION = 2400;
 const SPARKS = [
   { angle: -90, dist: 96, size: 9, color: GOLD, delay: 0 },
   { angle: -60, dist: 72, size: 6, color: '#ffffff', delay: 40 },
-  { angle: -30, dist: 104, size: 8, color: '#86c99b', delay: 90 },
+  { angle: -30, dist: 104, size: 8, color: '#93c5fd', delay: 90 },
   { angle: 0, dist: 80, size: 6, color: GOLD, delay: 30 },
   { angle: 30, dist: 100, size: 9, color: '#ffffff', delay: 70 },
-  { angle: 60, dist: 70, size: 6, color: '#86c99b', delay: 20 },
+  { angle: 60, dist: 70, size: 6, color: '#93c5fd', delay: 20 },
   { angle: 90, dist: 92, size: 8, color: GOLD, delay: 60 },
   { angle: 120, dist: 74, size: 6, color: '#ffffff', delay: 100 },
-  { angle: 150, dist: 102, size: 9, color: '#86c99b', delay: 45 },
+  { angle: 150, dist: 102, size: 9, color: '#93c5fd', delay: 45 },
   { angle: 180, dist: 78, size: 6, color: GOLD, delay: 15 },
   { angle: 210, dist: 98, size: 8, color: '#ffffff', delay: 85 },
-  { angle: 240, dist: 72, size: 6, color: '#86c99b', delay: 55 },
+  { angle: 240, dist: 72, size: 6, color: '#93c5fd', delay: 55 },
 ] as const;
 
 type GreetingOverlayProps = {
@@ -174,7 +174,7 @@ export function GreetingOverlay({ name, visible, onDone }: GreetingOverlayProps)
 
       <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
         <LinearGradient
-          colors={['#082414', PRIMARY, ACCENT]}
+          colors={['#081a3a', PRIMARY, ACCENT]}
           start={{ x: 0.05, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{

@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const { sendMail } = require('../utils/mailer');
 const { buildStudentPasswordResetEmailHtml } = require('../utils/emailTemplates');
 const { generateStrongPassword } = require('../utils/generatePassword');
+const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
 
 // @desc    Student-initiated password reset — generates a new random
 //          password for the student's OWN account (see /profile in the
@@ -37,4 +38,40 @@ const resetMyPassword = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, password: newPassword });
 });
 
-module.exports = { resetMyPassword };
+// @desc    Student changes their own password — must supply the current
+//          password; the new one must meet the password policy.
+// @route   POST /api/student/change-password
+// @access  Private/Student
+const changeMyPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body || {};
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ success: false, message: 'Please fill in all the password fields.' });
+  }
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ success: false, message: 'New password and confirm password do not match.' });
+  }
+  if (!isStrongPassword(newPassword)) {
+    return res.status(400).json({ success: false, message: PASSWORD_POLICY_MESSAGE });
+  }
+
+  const student = await Student.findById(req.user.id).select('+password');
+  if (!student) {
+    return res.status(404).json({ success: false, message: 'Student not found' });
+  }
+
+  const isMatch = await student.comparePassword(currentPassword);
+  if (!isMatch) {
+    return res.status(400).json({ success: false, message: 'Your current password is incorrect.' });
+  }
+  if (await student.comparePassword(newPassword)) {
+    return res.status(400).json({ success: false, message: 'New password must be different from your current password.' });
+  }
+
+  student.password = newPassword;
+  await student.save({ validateModifiedOnly: true });
+
+  res.status(200).json({ success: true, message: 'Your password has been changed.' });
+});
+
+module.exports = { resetMyPassword, changeMyPassword };

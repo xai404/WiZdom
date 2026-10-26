@@ -75,7 +75,7 @@ export const ACADEMIC_LEVELS = [
   'Gaps between education (if any)',
 ];
 
-// One row of the "Internship / Industry Experience" table.
+// One row of the "Internship Experience" or "Industry Experience" table.
 export type InternshipRow = {
   nameOfEmployer: string;
   addressOfEmployer: string;
@@ -83,6 +83,23 @@ export type InternshipRow = {
   salaryMonthly: string;
   dateFrom: string;
   dateTo: string;
+};
+
+export type YesNo = '' | 'yes' | 'no';
+const asYesNo = (v: any): YesNo => (v === 'yes' || v === 'no' ? v : '');
+
+// "Professional Details" answers — the internship / industry rows
+// themselves live in internshipExperience / industryExperience.
+export type ProfessionalDetails = {
+  hasInternship: '' | 'yes' | 'no';
+  hasIndustryExperience: '' | 'yes' | 'no';
+  industryYears: string;
+};
+
+export const EMPTY_PROFESSIONAL_DETAILS: ProfessionalDetails = {
+  hasInternship: '',
+  hasIndustryExperience: '',
+  industryYears: '',
 };
 
 // "Document Ready With You" checklist row.
@@ -126,8 +143,15 @@ export type Sif = {
   personalDetails: PersonalDetails;
   academicQualifications: AcademicQualification[];
   internshipExperience: InternshipRow[];
+  industryExperience: InternshipRow[];
+  professionalDetails: ProfessionalDetails;
+  // "Do you need assistance with your LOR / SOP?" — asked on the LOR / SOP tabs.
+  lorAssistance: YesNo;
+  sopAssistance: YesNo;
   documentChecklist: DocumentChecklistItem[];
   sop: SopDetails;
+  // When the student agreed to the SIF Terms & Conditions (set by the server).
+  termsAcceptedAt?: string | null;
   updatedAt?: string | null;
   updatedByName?: string | null;
 };
@@ -260,8 +284,15 @@ function normalizeSif(raw: any): Sif {
     internshipExperience: Array.isArray(raw?.internshipExperience)
       ? raw.internshipExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
       : [],
+    industryExperience: Array.isArray(raw?.industryExperience)
+      ? raw.industryExperience.map((r: any) => ({ ...EMPTY_INTERNSHIP_ROW, ...(r ?? {}) }))
+      : [],
+    professionalDetails: { ...EMPTY_PROFESSIONAL_DETAILS, ...(raw?.professionalDetails ?? {}) },
+    lorAssistance: asYesNo(raw?.lorAssistance),
+    sopAssistance: asYesNo(raw?.sopAssistance),
     documentChecklist: normalizeDocumentChecklist(raw?.documentChecklist),
     sop: { ...EMPTY_SOP, ...(raw?.sop ?? {}) },
+    termsAcceptedAt: raw?.termsAcceptedAt ?? null,
     updatedAt: raw?.updatedAt ?? null,
     updatedByName: raw?.updatedByName ?? null,
   };
@@ -289,7 +320,14 @@ export async function fetchMySif(token: string): Promise<Sif> {
   return normalizeSif(data.sif);
 }
 
-export async function updateMySif(token: string, sif: Sif): Promise<Sif> {
+// Sections are merged server-side — send only the ones this screen owns
+// (the SIF, LOR and SOP tabs each save their own part). `termsAccepted: true`
+// records the student's agreement to the SIF Terms & Conditions.
+export type SifUpdate = Partial<Omit<Sif, 'termsAcceptedAt' | 'updatedAt' | 'updatedByName'>> & {
+  termsAccepted?: boolean;
+};
+
+export async function updateMySif(token: string, sif: SifUpdate): Promise<Sif> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/student/sif`, {

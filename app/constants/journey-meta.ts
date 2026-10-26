@@ -13,26 +13,12 @@ export type StageMeta = {
 
 export const STAGE_META: StageMeta[] = [
   { title: 'Career Counselling', slug: 'career-counselling', icon: 'people-outline' },
-  { title: 'Country & Course Guidance', slug: 'country-course-guidance', icon: 'compass-outline' },
-  { title: 'Student Registration', slug: 'student-registration', icon: 'person-add-outline' },
-  { title: 'Test Prep', slug: 'test-prep', icon: 'school-outline' },
-  { title: 'Documentation', slug: 'documentation', icon: 'document-text-outline' },
-  { title: 'University Shortlisting', slug: 'university-shortlisting', icon: 'list-outline' },
-  { title: 'Profiling & Editing', slug: 'profiling-editing', icon: 'create-outline' },
+  { title: 'Documentation & Editing', slug: 'documentation-editing', icon: 'document-text-outline' },
   { title: 'Application Management', slug: 'application-management', icon: 'briefcase-outline' },
-  { title: 'Offer Letters', slug: 'offer-letters', icon: 'mail-open-outline' },
-  { title: 'Loan Application', slug: 'loan-application', icon: 'cash-outline' },
-  { title: 'Condition Fulfillment', slug: 'condition-fulfillment', icon: 'checkbox-outline' },
-  { title: 'University Deposit Payment', slug: 'university-deposit-payment', icon: 'card-outline' },
-  { title: 'Financial Documents', slug: 'financial-documents', icon: 'wallet-outline' },
-  { title: 'Visa Documentation', slug: 'visa-documentation', icon: 'folder-open-outline' },
-  { title: 'Visa Appointment', slug: 'visa-appointment', icon: 'calendar-outline' },
-  { title: 'Visa Lodging', slug: 'visa-lodging', icon: 'file-tray-full-outline' },
-  { title: 'Visa Status Update', slug: 'visa-status-update', icon: 'refresh-outline' },
-  { title: 'University Fee Payment', slug: 'university-fee-payment', icon: 'school-outline' },
-  { title: 'Accommodation Planning', slug: 'accommodation-planning', icon: 'home-outline' },
-  { title: 'Travel Planning', slug: 'travel-planning', icon: 'airplane-outline' },
-  { title: 'Process Complete', slug: 'process-complete', icon: 'ribbon-outline' },
+  { title: 'Finance', slug: 'finance', icon: 'wallet-outline' },
+  { title: 'Visa Application', slug: 'visa-application', icon: 'folder-open-outline' },
+  { title: 'Travel Plans', slug: 'travel-plans', icon: 'airplane-outline' },
+  { title: 'Completed', slug: 'completed', icon: 'ribbon-outline' },
 ];
 
 const metaByTitle = new Map(STAGE_META.map((meta) => [meta.title, meta]));
@@ -71,7 +57,7 @@ export const STATUS_META: Record<
     color: '#22c55e',
     bg: '#dcfce7',
     tint: '#f0fdf4',
-    tintDark: '#0f2417',
+    tintDark: '#0f1d3a',
     badgeBg: '#dcfce7',
     badgeText: '#16a34a',
     icon: 'checkmark-circle',
@@ -99,8 +85,8 @@ export const STATUS_META: Record<
     icon: 'ellipse-outline',
     pulse: false,
   },
-  // Terminal negative outcome (set by admin/employee on a stage — in
-  // practice only "Visa Status Update"). Rendered like Pending in the
+  // Terminal negative outcome (only the Visa Application → Decision
+  // sub-step can be set to it). Rendered like Pending in the
   // timeline nodes/connectors; the rose badge + label carry the meaning.
   rejected: {
     label: 'Rejected',

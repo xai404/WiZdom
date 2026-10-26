@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import clsx from 'clsx';
+import FieldLabel from './FieldLabel';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -14,11 +15,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || props.name;
     return (
       <div className="w-full">
-        {label && (
-          <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-slate-700">
-            {label}
-          </label>
-        )}
+        {label && <FieldLabel htmlFor={inputId} label={label} />}
         <div className="relative">
           {icon && (
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">

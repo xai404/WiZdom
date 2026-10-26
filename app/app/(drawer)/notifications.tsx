@@ -22,15 +22,15 @@ const DEFAULT_META_DARK = { bg: '#1e293b', color: '#94a3b8' };
 // than crashing the screen — the API response is out of this file's
 // control and notification types can grow independently of the app build.
 const TYPE_META: Partial<Record<NotificationType, { icon: keyof typeof Ionicons.glyphMap; bg: string; color: string }>> = {
-  stage_status: { icon: 'flag-outline', bg: '#ecf7ef', color: '#166534' },
+  stage_status: { icon: 'flag-outline', bg: '#eff6ff', color: '#1d4ed8' },
   remark: { icon: 'chatbubble-ellipses-outline', bg: '#ffedd5', color: '#c2410c' },
-  message: { icon: 'mail-outline', bg: '#dcfce7', color: '#16a34a' },
+  message: { icon: 'mail-outline', bg: '#dbeafe', color: '#2563eb' },
 };
 
 const TYPE_META_DARK: Partial<Record<NotificationType, { bg: string; color: string }>> = {
-  stage_status: { bg: '#0f2a1b', color: '#86c99b' },
+  stage_status: { bg: '#0f1f3d', color: '#93c5fd' },
   remark: { bg: '#2a1608', color: '#fb923c' },
-  message: { bg: '#0f2417', color: '#4ade80' },
+  message: { bg: '#0f1d3a', color: '#60a5fa' },
 };
 
 export default function NotificationsScreen() {
@@ -43,9 +43,13 @@ export default function NotificationsScreen() {
 
   const handlePress = (notification: AppNotification) => {
     if (!notification.read) markRead(notification._id);
-    // Stage-tagged notifications (remarks) deep-link straight to that
-    // stage's thread; general messages still open Group Chat, just without
-    // a stage filter, rather than doing nothing on tap.
+    // Journey updates and remarks open the progress screen — remarks live
+    // on the journey, never in Group Chat. Chat messages open Group Chat,
+    // landing on the tagged stage's messages when there is one.
+    if (notification.type === 'stage_status' || notification.type === 'remark') {
+      router.push('/progress' as never);
+      return;
+    }
     const meta = notification.stage ? getStageMetaByTitle(notification.stage) : null;
     router.push((meta ? { pathname: '/group-chat', params: { stage: meta.slug } } : '/group-chat') as never);
   };
@@ -89,7 +93,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           className="px-5"
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#86c99b' : '#166534'} />}>
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={isDark ? '#93c5fd' : '#1d4ed8'} />}>
           <View className="pt-2">
             {notifications?.map((notification, index) => (
               <NotificationRow
@@ -150,9 +154,9 @@ function NotificationRow({
         onPressOut={pressOut}
         className="mb-2.5 flex-row items-start gap-3 rounded-2xl px-4 py-3.5"
         style={{
-          backgroundColor: notification.read ? 'transparent' : isDark ? 'rgba(134,201,155,0.06)' : '#f4faf6',
+          backgroundColor: notification.read ? 'transparent' : isDark ? 'rgba(134,201,155,0.06)' : '#f4f7fd',
           borderLeftWidth: 3,
-          borderLeftColor: notification.read ? 'transparent' : isDark ? '#86c99b' : '#166534',
+          borderLeftColor: notification.read ? 'transparent' : isDark ? '#93c5fd' : '#1d4ed8',
         }}>
         <View
           className="h-9 w-9 items-center justify-center rounded-full"

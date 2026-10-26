@@ -42,6 +42,7 @@ const dayLabel = (iso: string) => {
 
 interface ChatTabProps {
   studentId: string;
+  studentName: string;
   stages: string[];
   currentStage: string;
   responsibleDepartment: string | null;
@@ -60,6 +61,7 @@ interface ChatTabProps {
 
 const ChatTab = ({
   studentId,
+  studentName,
   stages,
   currentStage,
   responsibleDepartment,
@@ -140,14 +142,18 @@ const ChatTab = ({
   // attaches/detaches the message listener for whichever student is
   // currently open, so switching students never leaves a stale listener
   // reacting to the wrong thread.
+  // Kept in a ref so the socket effect below doesn't re-bind on every parent
+  // render (StudentDetailPanel passes a fresh callback each time).
+  const onAfterChangeRef = useRef(onAfterChange);
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    onAfterChangeRef.current = onAfterChange;
+  }, [onAfterChange]);
 
+  useEffect(() => {
     const handleNewMessage = (incoming: ChatMessage & { studentId: string }) => {
       if (incoming.studentId !== studentId) return;
       setMessages((prev) => (prev.some((m) => m._id === incoming._id) ? prev : [...prev, incoming]));
-      onAfterChange();
+      onAfterChangeRef.current();
     };
 
     // An existing message changed in place elsewhere — another admin (or the
@@ -160,21 +166,63 @@ const ChatTab = ({
     const handleThreadCleared = (payload: { studentId: string }) => {
       if (payload.studentId !== studentId) return;
       setMessages([]);
-      onAfterChange();
+      onAfterChangeRef.current();
     };
 
-    socket.on('chat:new-message', handleNewMessage);
-    socket.on('chat:message-updated', handleUpdatedMessage);
-    socket.on('chat:thread-cleared', handleThreadCleared);
-    return () => {
+    // After a (re)connect, anything sent while the socket was down never
+    // arrives as an event — re-pull the thread once to catch up.
+    const handleReconnect = async () => {
+      try {
+        const fresh = await fetchStudentChat(studentId);
+        signatureRef.current = chatSignature(fresh);
+        setMessages(fresh);
+      } catch {
+        // The poll will catch up on its next tick.
+      }
+    };
+
+    const attach = (socket: NonNullable<ReturnType<typeof getSocket>>) => {
+      socket.on('chat:new-message', handleNewMessage);
+      socket.on('chat:message-updated', handleUpdatedMessage);
+      socket.on('chat:thread-cleared', handleThreadCleared);
+      socket.on('connect', handleReconnect);
+    };
+    const detach = (socket: NonNullable<ReturnType<typeof getSocket>>) => {
       socket.off('chat:new-message', handleNewMessage);
       socket.off('chat:message-updated', handleUpdatedMessage);
       socket.off('chat:thread-cleared', handleThreadCleared);
+      socket.off('connect', handleReconnect);
     };
-  }, [studentId, setMessages, onAfterChange]);
 
-  const handleSend = async (text: string, stage: string | null, replyToId: string | null, department: string | null) => {
-    await postStudentChatMessage(studentId, text, stage, replyToId, department);
+    // Same pattern as StudentsWorkspace: the socket can be null on first
+    // mount or replaced later (login / session restore opens a new one and
+    // drops every listener on the old), so keep checking and re-attach to
+    // whatever the current socket is.
+    let bound: ReturnType<typeof getSocket> = null;
+    const bind = () => {
+      const socket = getSocket();
+      if (!socket || socket === bound) return;
+      if (bound) detach(bound);
+      attach(socket);
+      bound = socket;
+    };
+    bind();
+    const rebindTimer = setInterval(bind, 1000);
+
+    return () => {
+      clearInterval(rebindTimer);
+      if (bound) detach(bound);
+    };
+  }, [studentId, setMessages]);
+
+  const handleSend = async (
+    text: string,
+    stage: string | null,
+    replyToId: string | null,
+    department: string | null,
+    mentionStudent: boolean
+  ) => {
+    await postStudentChatMessage(studentId, text, stage, replyToId, department, mentionStudent);
     const fresh = await fetchStudentChat(studentId);
     signatureRef.current = chatSignature(fresh);
     isAtBottomRef.current = true;
@@ -378,6 +426,7 @@ const ChatTab = ({
                     else bubbleRefs.current.delete(msg._id);
                   }}
                   message={msg}
+                  studentName={studentName}
                   quoted={quoted}
                   highlighted={highlightedId === msg._id}
                   currentUserId={user?.id ?? null}
@@ -402,6 +451,7 @@ const ChatTab = ({
       ) : (
         <ChatComposer
           stages={stages}
+          studentName={studentName}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingToId(null)}
           onSend={handleSend}

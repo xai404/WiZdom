@@ -69,7 +69,7 @@ const StudentListPanel = ({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="shrink-0 space-y-3 border-b border-brand-100/70 p-4">
+      <div className="shrink-0 space-y-2 border-b border-brand-100/70 p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-slate-800">Students</h2>
           {canCreate && (
@@ -82,6 +82,7 @@ const StudentListPanel = ({
         <Select
           aria-label="Filter students"
           value={milestone}
+          className="py-2!"
           onChange={(e) => onMilestoneChange(e.target.value as StudentMilestoneFilter | '')}
         >
           <option value="">All students</option>
@@ -93,7 +94,7 @@ const StudentListPanel = ({
         </Select>
       </div>
 
-      <div onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto p-2.5">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 6 }, (_, i) => (

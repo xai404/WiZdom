@@ -1,13 +1,14 @@
 const asyncHandler = require('express-async-handler');
 const Student = require('../models/Student');
-const Message = require('../models/Message');
 const ApiError = require('../utils/ApiError');
-const { JOURNEY_STAGES } = require('../constants/journeyStages');
+const { buildRemarksByStage } = require('../utils/journeyRemarks');
+const { buildJourney } = require('../utils/journeySteps');
 
 // @desc    Get the current student's study-abroad journey (read-only —
 //          only Admin-side tooling is meant to ever change stage status).
-//          Each stage's remark is simply the latest Group Chat message
-//          tagged with that stage — there is no separate remark to manage.
+//          7 steps, each with its sub-steps and a status derived from them
+//          (see utils/journeySteps), plus the step's staff remarks —
+//          `remarks` is the full list, `latestRemark` the newest text.
 // @route   GET /api/student/journey
 // @access  Private/Student
 const getMyJourney = asyncHandler(async (req, res) => {
@@ -16,26 +17,8 @@ const getMyJourney = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Student not found');
   }
 
-  const savedByTitle = new Map(student.journey.map((stage) => [stage.title, stage]));
-
-  // One latest tagged message per stage, in a single query.
-  const latestByStage = await Message.aggregate([
-    { $match: { student: student._id, stage: { $ne: null } } },
-    { $sort: { createdAt: -1 } },
-    { $group: { _id: '$stage', text: { $first: '$text' }, createdAt: { $first: '$createdAt' } } },
-  ]);
-  const remarkByStage = new Map(latestByStage.map((row) => [row._id, row]));
-
-  const journey = JOURNEY_STAGES.map((title) => {
-    const saved = savedByTitle.get(title);
-    const remark = remarkByStage.get(title);
-    return {
-      title,
-      status: saved?.status || 'pending',
-      latestRemark: remark?.text || null,
-      updatedAt: remark?.createdAt || saved?.updatedAt || null,
-    };
-  });
+  const remarksFor = await buildRemarksByStage(student, { forStudent: true });
+  const journey = buildJourney(student, remarksFor);
 
   // Same reasoning as studentChatController.getMyChat — without this, a
   // cache sitting anywhere between the app and this endpoint (mobile OS

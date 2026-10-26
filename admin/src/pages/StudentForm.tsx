@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, CreditCard, Globe2, Lock, Mail, Phone, Sparkles, User, Users, X } from 'lucide-react';
+import { ArrowLeft, CalendarClock, CreditCard, Globe2, Lock, Mail, MessageSquareText, Phone, Sparkles, User, Users, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../components/DashboardLayout';
 import { createStudent, fetchStudentById, updateStudent } from '../api/students';
-import { Badge, Button, Card, Input, Select } from '../components/ui';
-import { PAYMENT_STATUSES, STUDENT_STATUSES, type PaymentStatus, type StudentStatus } from '../types';
+import { Badge, Button, Card, Input, PaymentStars, Select } from '../components/ui';
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUSES, STUDENT_STATUSES, type PaymentStatus, type StudentStatus } from '../types';
 import { generateStrongPassword } from '../utils/generatePassword';
 
 const COUNTRIES = [
@@ -30,6 +30,7 @@ interface FormState {
   status: StudentStatus;
   groupName: string;
   paymentStatus: PaymentStatus | '';
+  paymentRemark: string;
   password: string;
 }
 
@@ -43,6 +44,7 @@ const emptyForm: FormState = {
   status: 'Active',
   groupName: '',
   paymentStatus: '',
+  paymentRemark: '',
   password: '',
 };
 
@@ -82,6 +84,7 @@ const StudentForm = () => {
           status: s.status ?? 'Active',
           groupName: s.groupName ?? '',
           paymentStatus: s.paymentStatus ?? '',
+          paymentRemark: s.paymentRemark ?? '',
           password: '',
         });
       })
@@ -110,6 +113,10 @@ const StudentForm = () => {
       setError('Name, phone and email are required.');
       return;
     }
+    if (form.paymentStatus && !form.paymentRemark.trim()) {
+      setError('Add a payment remark for the selected payment confirmation.');
+      return;
+    }
     if (!isEdit && !form.password) {
       setError('Generate a password for this student.');
       return;
@@ -131,6 +138,7 @@ const StudentForm = () => {
         status: form.status,
         groupName: form.groupName,
         paymentStatus: form.paymentStatus || null,
+        paymentRemark: form.paymentStatus ? form.paymentRemark.trim() : '',
       };
 
       if (isEdit && id) {
@@ -286,6 +294,11 @@ const StudentForm = () => {
                   <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
                     <CreditCard size={16} className="text-slate-400" />
                     Payment Confirmation
+                    {form.paymentStatus && (
+                      <span className="ml-auto">
+                        <PaymentStars paymentStatus={form.paymentStatus} size={14} />
+                      </span>
+                    )}
                   </label>
                   <Select
                     value={form.paymentStatus}
@@ -294,16 +307,38 @@ const StudentForm = () => {
                     <option value="">Not set</option>
                     {PAYMENT_STATUSES.map((p) => (
                       <option key={p} value={p}>
-                        {p}
+                        {PAYMENT_STATUS_LABELS[p]}
                       </option>
                     ))}
                   </Select>
                 </div>
+                {form.paymentStatus && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                      <MessageSquareText size={16} className="text-slate-400" />
+                      Payment Remark <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={form.paymentRemark}
+                      onChange={(e) => set('paymentRemark', e.target.value)}
+                      placeholder={
+                        form.paymentStatus === 'Free'
+                          ? 'Why is this student free? (e.g. scholarship, referral offer)'
+                          : 'Amount received, receipt / transaction reference, date…'
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                    />
+                  </div>
+                )}
               </div>
 
               {!isEdit && (
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Password (Auto Generated)</label>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Password (Auto Generated) <span className="text-red-500">*</span>
+                  </label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       icon={<Lock size={16} />}

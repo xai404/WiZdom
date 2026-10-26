@@ -5,11 +5,20 @@ const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
 const { initSocket } = require('./socket');
+const { migrateLegacyJourneys } = require('./utils/journeySteps');
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+
+  // Moves any progress saved under the old 21-stage journey onto the 7
+  // steps / sub-steps. Idempotent; a failure must not stop the server.
+  try {
+    await migrateLegacyJourneys();
+  } catch (err) {
+    console.error(`Journey migration failed: ${err.message}`);
+  }
 
   // Socket.IO attaches to the same HTTP server/port Express already
   // listens on — app.listen(...) is just http.createServer(app).listen(...)

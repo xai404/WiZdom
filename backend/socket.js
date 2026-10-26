@@ -77,6 +77,7 @@ function buildChatMessagePayload(message, studentId) {
     text: obj.text,
     stage: obj.stage ?? null,
     department: obj.department ?? null,
+    mentionsStudent: obj.mentionsStudent ?? false,
     replyTo: obj.replyTo ? obj.replyTo.toString() : null,
     readByStudent: obj.readByStudent,
     readByAdmin: obj.readByAdmin,
@@ -151,6 +152,11 @@ function emitProgressUpdate(studentId, stage) {
     title: stage.title,
     status: stage.status,
     updatedAt: stage.updatedAt,
+    // Only present when the stage's remark changed — the app leaves its
+    // current remark alone when this key is missing.
+    ...(stage.latestRemark !== undefined ? { latestRemark: stage.latestRemark } : {}),
+    ...(stage.remarks !== undefined ? { remarks: stage.remarks } : {}),
+    ...(stage.substeps !== undefined ? { substeps: stage.substeps } : {}),
   });
 }
 

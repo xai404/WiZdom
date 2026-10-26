@@ -7,12 +7,13 @@ import { useAuth } from '@/context/auth-context';
 import { useJourney } from '@/context/journey-context';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-const PRIMARY = '#166534';
+const PRIMARY = '#1d4ed8';
 const GOLD = '#f59e0b';
 const TOTAL_FEE_STARS = 4;
 
-// Fees fully paid -> all 4 stars filled; half payment -> 2 of 4; anything
-// else (free/unset) -> 0 filled, i.e. 4 blank stars by default.
+// Fees fully paid -> all 4 stars filled; half payment -> 2 of 4; unset -> 4
+// blank stars. Free students get a "Free Payment" pill instead, matching the
+// admin panel's PaymentStars, so they never read as unpaid.
 function filledFeeStars(paymentStatus?: string | null): number {
   if (paymentStatus === 'Paid in Full') return 4;
   if (paymentStatus === 'Half Payment') return 2;
@@ -20,6 +21,21 @@ function filledFeeStars(paymentStatus?: string | null): number {
 }
 
 function FeeStars({ paymentStatus, isDark }: { paymentStatus?: string | null; isDark: boolean }) {
+  if (paymentStatus === 'Free') {
+    return (
+      <View
+        className="mt-1 flex-row items-center gap-1 self-start rounded-full px-2 py-0.5"
+        style={{ backgroundColor: isDark ? 'rgba(139,92,246,0.18)' : '#ede9fe' }}>
+        <Ionicons name="gift" size={11} color={isDark ? '#c4b5fd' : '#6d28d9'} />
+        <Text
+          className="text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: isDark ? '#c4b5fd' : '#6d28d9' }}>
+          Free Payment
+        </Text>
+      </View>
+    );
+  }
+
   const filled = filledFeeStars(paymentStatus);
   return (
     <View className="mt-1 flex-row gap-0.5">
@@ -77,20 +93,25 @@ export function JourneyHeroCard() {
       className="mb-4 rounded-3xl px-5 py-5 dark:bg-card-dark"
       style={{
         backgroundColor: isDark ? undefined : '#ffffff',
-        shadowColor: '#0e3d22',
+        shadowColor: '#0e2a5c',
         shadowOpacity: isDark ? 0 : 0.1,
         shadowRadius: 24,
         shadowOffset: { width: 0, height: 10 },
         elevation: isDark ? 0 : 3,
       }}>
       <View className="flex-row items-start justify-between">
-        <View>
+        <View className="flex-1 pr-3">
           <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Overall Progress
           </Text>
           <FeeStars paymentStatus={user?.paymentStatus} isDark={isDark} />
+          {user?.paymentStatus === 'Paid in Full' || user?.paymentStatus === 'Half Payment' ? (
+            <Text className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {user.paymentStatus === 'Paid in Full' ? 'Full Payment' : 'Half Payment'}
+            </Text>
+          ) : null}
           <View className="mt-1 flex-row items-baseline gap-1.5">
-            <Text className="text-3xl font-extrabold" style={{ color: isDark ? '#86c99b' : PRIMARY }}>
+            <Text className="text-3xl font-extrabold" style={{ color: isDark ? '#93c5fd' : PRIMARY }}>
               {Math.round(fraction * 100)}%
             </Text>
             <Text className="text-sm font-semibold text-slate-400 dark:text-slate-500">Completed</Text>
@@ -110,10 +131,10 @@ export function JourneyHeroCard() {
         </View>
       </View>
 
-      <View className="mt-4" style={{ height: 10, borderRadius: 999, backgroundColor: isDark ? '#1a2e22' : '#eef2f7', overflow: 'hidden' }}>
+      <View className="mt-4" style={{ height: 10, borderRadius: 999, backgroundColor: isDark ? '#1a2540' : '#eef2f7', overflow: 'hidden' }}>
         <Animated.View style={{ height: '100%', width: widthPct, borderRadius: 999, overflow: 'hidden' }}>
           <LinearGradient
-            colors={isDark ? ['#4caf6e', '#86c99b'] : ['#166534', '#2e8b57']}
+            colors={isDark ? ['#3b82f6', '#93c5fd'] : ['#1d4ed8', '#2563eb']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ flex: 1 }}
@@ -124,7 +145,7 @@ export function JourneyHeroCard() {
       <Text className="mt-2.5 text-xs font-medium text-slate-500 dark:text-slate-400">
         {completed} of {total} stages completed{remaining > 0 ? ` • Only ${remaining} step${remaining === 1 ? '' : 's'} left` : ''}
       </Text>
-      <Text className="mt-1.5 text-[13px] font-bold" style={{ color: isDark ? '#86c99b' : PRIMARY }}>
+      <Text className="mt-1.5 text-[13px] font-bold" style={{ color: isDark ? '#93c5fd' : PRIMARY }}>
         {motivationalLine(fraction, remaining)}
       </Text>
     </View>

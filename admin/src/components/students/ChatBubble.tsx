@@ -14,6 +14,7 @@ const EDIT_WINDOW_MS = 10 * 60 * 1000;
 
 interface ChatBubbleProps {
   message: ChatMessage;
+  studentName: string;
   quoted: ChatMessage | null;
   highlighted: boolean;
   currentUserId: string | null;
@@ -26,7 +27,7 @@ interface ChatBubbleProps {
 }
 
 const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
-  ({ message, quoted, highlighted, currentUserId, isAwaitingTarget, onReply, onDelete, onEditSave, onTogglePin, onJumpToQuote }, ref) => {
+  ({ message, studentName, quoted, highlighted, currentUserId, isAwaitingTarget, onReply, onDelete, onEditSave, onTogglePin, onJumpToQuote }, ref) => {
     // A message only renders on the right when it's the CURRENT staff
     // member's own message. Every other message — a different staff
     // member's, or the student's — renders on the left, regardless of
@@ -73,7 +74,7 @@ const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
               onEdit={startEdit}
               onTogglePin={onTogglePin}
               pinned={message.pinned}
-              showDelete={isStaffMessage}
+              showDelete={isSelf}
               showEdit={canEdit}
               align="right"
             />
@@ -134,6 +135,12 @@ const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
               </div>
             ) : (
               <>
+                {message.mentionsStudent && (
+                  <div className="mb-1.5 flex items-center gap-1 border-b border-slate-200 pb-1 text-[10px] font-semibold">
+                    <AtSign size={10} className="text-brand-500" />
+                    <span className="text-brand-600">{studentName}</span>
+                  </div>
+                )}
                 {message.department && (
                   <div className="mb-1.5 flex items-center gap-1 border-b border-slate-200 pb-1 text-[10px] font-semibold">
                     <AtSign size={10} className="text-emerald-500" />
@@ -185,7 +192,7 @@ const ChatBubble = forwardRef<HTMLDivElement, ChatBubbleProps>(
               onEdit={startEdit}
               onTogglePin={onTogglePin}
               pinned={message.pinned}
-              showDelete={isStaffMessage}
+              showDelete={false}
               showEdit={canEdit}
               align="left"
             />

@@ -7,13 +7,23 @@ import type { ChatMessage } from '../../types';
 
 interface ChatComposerProps {
   stages: string[];
+  studentName: string;
   replyingTo: ChatMessage | null;
   onCancelReply: () => void;
-  onSend: (text: string, stage: string | null, replyToId: string | null, department: string | null) => Promise<void>;
+  onSend: (
+    text: string,
+    stage: string | null,
+    replyToId: string | null,
+    department: string | null,
+    mentionStudent: boolean
+  ) => Promise<void>;
 }
 
-const ChatComposer = ({ stages, replyingTo, onCancelReply, onSend }: ChatComposerProps) => {
+const ChatComposer = ({ stages, studentName, replyingTo, onCancelReply, onSend }: ChatComposerProps) => {
   const [text, setText] = useState('');
+  // @mention the student — highlights the message for them and sends a
+  // "you were mentioned" push.
+  const [mentionStudent, setMentionStudent] = useState(false);
   const [stage, setStage] = useState('');
   const [department, setDepartment] = useState('');
   const [sending, setSending] = useState(false);
@@ -33,10 +43,11 @@ const ChatComposer = ({ stages, replyingTo, onCancelReply, onSend }: ChatCompose
     if (!text.trim() || sending) return;
     setSending(true);
     try {
-      await onSend(text.trim(), stage || null, replyingTo?._id ?? null, department || null);
+      await onSend(text.trim(), stage || null, replyingTo?._id ?? null, department || null, mentionStudent);
       setText('');
       setStage('');
       setDepartment('');
+      setMentionStudent(false);
     } finally {
       setSending(false);
     }
@@ -57,6 +68,20 @@ const ChatComposer = ({ stages, replyingTo, onCancelReply, onSend }: ChatCompose
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setMentionStudent((v) => !v)}
+          aria-pressed={mentionStudent}
+          title={mentionStudent ? `${studentName} will be notified` : `Tag ${studentName} in this message`}
+          className={`flex max-w-44 shrink-0 items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs transition ${
+            mentionStudent
+              ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700'
+              : 'border-slate-200 bg-white text-slate-400 hover:border-brand-300 hover:text-brand-600'
+          }`}
+        >
+          <AtSign size={13} className="shrink-0" />
+          <span className="truncate">{studentName}</span>
+        </button>
         <div className="w-36 shrink-0">
           <Select
             icon={<AtSign size={13} />}

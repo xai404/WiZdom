@@ -9,8 +9,8 @@ import confettiAnimation from '@/assets/lottie/confetti-burst.json';
 import { useAuth } from '@/context/auth-context';
 import { useJourney } from '@/context/journey-context';
 
-const PRIMARY = '#166534';
-const ACCENT = '#2e8b57';
+const PRIMARY = '#1d4ed8';
+const ACCENT = '#2563eb';
 const GOLD = '#f59e0b';
 
 // Fires once per student, the first time every journey stage reaches
@@ -102,7 +102,7 @@ export function JourneyCelebrationModal() {
               elevation: 14,
             }}>
             <LinearGradient
-              colors={['#05190e', PRIMARY, ACCENT]}
+              colors={['#0b1530', PRIMARY, ACCENT]}
               start={{ x: 0.1, y: 0 }}
               end={{ x: 0.9, y: 1 }}
               style={{ paddingTop: 40, paddingBottom: 28, paddingHorizontal: 26, alignItems: 'center' }}>
@@ -140,7 +140,7 @@ export function JourneyCelebrationModal() {
                   fontWeight: '700',
                   letterSpacing: 2.2,
                   textTransform: 'uppercase',
-                  color: '#b5dcc1',
+                  color: '#b8d2f6',
                   marginBottom: 8,
                 }}>
                 Journey Complete

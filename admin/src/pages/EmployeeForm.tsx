@@ -179,11 +179,11 @@ const EmployeeForm = () => {
               <FileDropzone previewUrl={existingPicture} onFileSelect={setProfilePicture} />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="Employee Name" icon={<User size={16} />} value={form.name} onChange={(e) => set('name', e.target.value)} />
-                <Input label="Email" type="email" icon={<Mail size={16} />} value={form.email} onChange={(e) => set('email', e.target.value)} />
-                <Input label="Phone Number" type="tel" icon={<Phone size={16} />} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                <Input label="Employee Name *" icon={<User size={16} />} value={form.name} onChange={(e) => set('name', e.target.value)} />
+                <Input label="Email *" type="email" icon={<Mail size={16} />} value={form.email} onChange={(e) => set('email', e.target.value)} />
+                <Input label="Phone Number *" type="tel" icon={<Phone size={16} />} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
                 <Select
-                  label="Department"
+                  label="Department *"
                   icon={<Building2 size={16} />}
                   value={form.department}
                   onChange={(e) => set('department', e.target.value)}
@@ -225,6 +225,7 @@ const EmployeeForm = () => {
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   {isEdit ? 'New Password (optional)' : 'Password'}
+                  {!isEdit && <span className="ml-0.5 text-red-500">*</span>}
                 </label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
